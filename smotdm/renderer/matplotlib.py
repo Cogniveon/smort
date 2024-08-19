@@ -71,7 +71,7 @@ class MatplotlibRender:
             fontsize=self.fontsize,
             canonicalize=self.canonicalize,
         )
-    
+
     def __call__(
         self,
         joints1,
@@ -164,6 +164,7 @@ def update_camera(ax, root, radius=1.5):
 
 def init_skeleton_plot():
     pass
+
 
 def render_animation(
     joints: np.ndarray,
@@ -281,6 +282,7 @@ def render_animation(
 
     if output == "notebook":
         from IPython.display import HTML, display
+
         display(HTML(anim.to_jshtml()))
     else:
         # anim.save(output, writer='ffmpeg', fps=fps)
@@ -308,6 +310,7 @@ def render_animation(
 ):
     if agg:
         import matplotlib
+
         matplotlib.use("Agg")
 
     assert jointstype in KINEMATIC_TREES
@@ -428,6 +431,7 @@ def render_animation(
 
     if output == "notebook":
         from IPython.display import HTML, display
+
         display(HTML(anim.to_jshtml()))
     else:
         anim.save(output, fps=fps)

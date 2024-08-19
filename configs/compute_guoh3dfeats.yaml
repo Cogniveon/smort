@@ -4,3 +4,4 @@ defaults:
 
 base_dir: deps/interx
 output_file: deps/interx/dataset.h5
+device: mps:0
