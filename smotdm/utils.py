@@ -12,14 +12,12 @@ def loop_interx(base_dir: str, exclude: list[str] = [], device=torch.device("cpu
             for line in annotation.readlines():
                 texts.append(line.rstrip("\n"))
 
-            num_frames = 0
             motions = []
             for file in [
                 f"{base_dir}/motions/{scene_id}/P1.npz",
                 f"{base_dir}/motions/{scene_id}/P2.npz",
             ]:
                 data = np.load(file)
-                num_frames += data["pose_body"].shape[0]
                 motions.append(
                     {
                         "body_pose": torch.tensor(
@@ -40,6 +38,5 @@ def loop_interx(base_dir: str, exclude: list[str] = [], device=torch.device("cpu
                     }
                 )
 
-            num_frames = num_frames // len(motions)
-            pbar.set_postfix(dict(scene_id=scene_id), num_frames=num_frames)
-            yield scene_id, num_frames, motions, texts
+            pbar.set_postfix(dict(scene_id=scene_id))
+            yield scene_id, motions, texts

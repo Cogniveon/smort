@@ -148,7 +148,7 @@ def get_forward_direction(poses, jointstype="smplxjoints"):
     across = (
         poses[..., RH, :] - poses[..., LH, :] + poses[..., RS, :] - poses[..., LS, :]
     )
-    forward = torch.stack((-across[..., 1], across[..., 0]), axis=-1)
+    forward = torch.stack((-across[..., 1], across[..., 0]), dim=-1)
     forward = torch.nn.functional.normalize(forward, dim=-1)
     return forward
 

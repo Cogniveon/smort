@@ -30,32 +30,28 @@ def compute_guoh3dfeats(cfg: DictConfig):
     dataset = h5py.File(output_file, "w")
     motions_dataset = dataset.create_group("motions")
     texts_dataset = dataset.create_group("texts")
-    smplx_model = SMPLX(
-        model_path="deps/smplx/SMPLX_NEUTRAL.npz",
-        num_betas=10,
-        use_pca=False,
-        use_face_contour=True,
-    ).to(device)
 
-    for scene_id, num_frames, motions, texts in iterator:
+    for scene_id, motions, texts in iterator:
         # joints[..., 0] *= -1
         # joints_m = swap_left_right(joints)
 
         feats = []
         for motion in motions:
             with torch.no_grad():
+                smplx_model = SMPLX(
+                    model_path="deps/smplx/SMPLX_NEUTRAL.npz",
+                    num_betas=10,
+                    use_pca=False,
+                    use_face_contour=True,
+                    batch_size=motion['body_pose'].shape[0]
+                ).to(device)
                 output = smplx_model(
                     **motion,
                     return_full_pose=True,
                 )
-                # XZY -> XYZ
-                joints = torch.tensor(
-                    np.dot(
-                        output.joints.detach().cpu().numpy(),
-                        np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]),
-                    ),
-                    dtype=torch.float32,
-                    device=device,
+                joints = torch.matmul(
+                    output.joints,
+                    torch.tensor([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]], device=device),
                 )
 
             feats.append(joints_to_rifke(joints[:, : smplx_model.NUM_JOINTS, :]))
@@ -64,7 +60,8 @@ def compute_guoh3dfeats(cfg: DictConfig):
             scene_motions.shape[-1] == 163
         ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"
 
-        logger.debug(scene_motions.shape)
+        
+        num_frames = np.min(scene_motions[:].shape[0])
 
         scene_dataset = motions_dataset.create_dataset(
             scene_id, data=scene_motions[:, :num_frames, :].detach().cpu().numpy()
