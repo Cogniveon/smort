@@ -30,6 +30,12 @@ def compute_guoh3dfeats(cfg: DictConfig):
     dataset = h5py.File(output_file, "w")
     motions_dataset = dataset.create_group("motions")
     texts_dataset = dataset.create_group("texts")
+    smplx_model = SMPLX(
+        model_path="deps/smplx/SMPLX_NEUTRAL.npz",
+        num_betas=10,
+        use_pca=False,
+        use_face_contour=True,
+    ).to(device)
 
     for scene_id, num_frames, motions, texts in iterator:
         # joints[..., 0] *= -1
@@ -37,26 +43,20 @@ def compute_guoh3dfeats(cfg: DictConfig):
 
         feats = []
         for motion in motions:
-            smplx_model = SMPLX(
-                model_path="deps/smplx/SMPLX_NEUTRAL.npz",
-                batch_size=num_frames,
-                num_betas=10,
-                use_pca=False,
-                use_face_contour=True,
-            ).to(device)
-            output = smplx_model(
-                **motion,
-                return_full_pose=True,
-            )
-            # XZY -> XYZ
-            joints = torch.tensor(
-                np.dot(
-                    output.joints.detach().cpu().numpy(),
-                    np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]),
-                ),
-                dtype=torch.float32,
-                device=device,
-            )
+            with torch.no_grad():
+                output = smplx_model(
+                    **motion,
+                    return_full_pose=True,
+                )
+                # XZY -> XYZ
+                joints = torch.tensor(
+                    np.dot(
+                        output.joints.detach().cpu().numpy(),
+                        np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]),
+                    ),
+                    dtype=torch.float32,
+                    device=device,
+                )
 
             feats.append(joints_to_rifke(joints[:, : smplx_model.NUM_JOINTS, :]))
         scene_motions = torch.stack(feats)
