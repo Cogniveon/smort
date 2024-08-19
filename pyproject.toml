@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8", "wheel", "build"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smotdm"
+authors = [{ name = "Rohit Krishnan", email = "rohit.k.kesavan@gmail.com" }]
+requires-python = ">=3.9"
+dynamic = ["version"]
+license = { file = "LICENSE" }
+dependencies = [
+    'importlib-metadata; python_version<"3.10"',
+    "numpy",
+    "pandas",
+    "einops",
+    "torch",
+    "torchvision",
+    "smplx",
+    "h5py",
+    "matplotlib",
+    "lightning",
+    "omegaconf",
+    "plotly",
+    "jupyterlab",
+    "jupyterlab-lsp",
+    "python-lsp-server[all]",
+    "ipykernel",
+    "ipywidgets",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["smotdm*"]
+
+[tool.setuptools_scm]
+version_file = "smotdm/__version__.py"
+
+# [project.optional-dependencies]
+# docs = [
+#   "mkdocs==1.5.2",
+#   "mkdocs-gen-files==0.5.0",
+#   "mkdocs-material==9.3.1",
+#   "mkdocs-section-index==0.3.6",
+#   "mkdocstrings-python==1.6.3"
+# ]
+# tests = [
+#   "pytest==7.2.0",
+#   "pytest-sugar==0.9.5",
+#   "pytest-cov==3.0.0",
+#   "pytest-mock==3.8.2",
+#   "mypy==1.9.0"
+# ]
+# dev = [
+#   "smotdm[tests]",
+#   "smotdm[docs]",
+#   "jupyterlab",
+#   "ipykernel",
+#   "ipywidgets"
+# ]
+
+# [project.scripts]
+# cli-script = "pkg:function"
+# [project.gui-scripts]
+# gui-script = "pkg:function"
+# [project.scripts]
+# process-amass = "smotdm_data.process_amass:main"
+# run-ui = "smotdm_ui.__main__:main"
+# train = "smotdm_trainer.__main__:train"
+# inference-server = "smotdm_inference.__main__:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
