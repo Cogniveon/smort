@@ -5,11 +5,16 @@ import numpy as np
 
 from torch import Tensor
 
-from .geometry import axis_angle_rotation, matrix_to_axis_angle
-from .joints import INFOS
+from smotdm.geometry import axis_angle_rotation, matrix_to_axis_angle
+from smotdm.joints import INFOS
 
 
-def joints_to_rifke(joints, jointstype="smplxjoints"):
+def joints_to_rifke(
+    joints,
+    jointstype="smplxjoints",
+    # relative_translation: Optional[Tensor] = None,
+    # relative_orient: Optional[Tensor] = None,
+):
     # Joints to rotation invariant poses (Holden et. al.)
     # Similar function than fke2rifke in Language2Pose repository
     # Adapted from the pytorch version of TEMOS
@@ -22,7 +27,6 @@ def joints_to_rifke(joints, jointstype="smplxjoints"):
     poses = joints.clone()
     poses[..., 2] -= ground
 
-    poses = joints.clone()
     translation = poses[..., 0, :].clone()
 
     # Let the root have the Z translation --> gravity axis
@@ -67,7 +71,7 @@ def joints_to_rifke(joints, jointstype="smplxjoints"):
 
     poses_local = torch.einsum("...lj,...jk->...lk", poses[..., [0, 1]], rotations_inv)
     poses_local = torch.stack(
-        (poses_local[..., 0], poses_local[..., 1], poses[..., 2]), axis=-1
+        (poses_local[..., 0], poses_local[..., 1], poses[..., 2]), dim=-1
     )
 
     # stack the xyz joints into feature vectors
@@ -80,16 +84,16 @@ def joints_to_rifke(joints, jointstype="smplxjoints"):
 
     # Stack things together
     features = group(root_grav_axis, poses_features, vel_angles, vel_trajectory_local)
-    return features
+    return features, translation, angles
 
 
-def rifke_to_joints(features: Tensor, jointstype="smplxjoints") -> Tensor:
+def rifke_to_joints(features: Tensor) -> Tensor:
     root_grav_axis, poses_features, vel_angles, vel_trajectory_local = ungroup(features)
-
     # Remove the dummy last angle and integrate the angles
     angles = torch.cumsum(vel_angles[..., :-1], dim=-1)
     # The first angle is zero
     angles = torch.cat((0 * angles[..., [0]], angles), dim=-1)
+
     rotations = axis_angle_rotation("Z", angles)[..., :2, :2]
 
     # Get back the poses
@@ -97,7 +101,7 @@ def rifke_to_joints(features: Tensor, jointstype="smplxjoints") -> Tensor:
 
     # Rotate the poses
     poses = torch.einsum("...lj,...jk->...lk", poses_local[..., [0, 1]], rotations)
-    poses = torch.stack((poses[..., 0], poses[..., 1], poses_local[..., 2]), axis=-1)
+    poses = torch.stack((poses[..., 0], poses[..., 1], poses_local[..., 2]), dim=-1)
 
     # Rotate the vel_trajectory
     vel_trajectory = torch.einsum("...j,...jk->...k", vel_trajectory_local, rotations)
@@ -114,6 +118,7 @@ def rifke_to_joints(features: Tensor, jointstype="smplxjoints") -> Tensor:
 
     # Add the trajectory globally
     poses[..., [0, 1]] += trajectory[..., None, :]
+
     return poses
 
 
@@ -131,7 +136,7 @@ def group(root_grav_axis, poses_features, vel_angles, vel_trajectory_local):
     return features
 
 
-def ungroup(features: Tensor) -> tuple[Tensor]:
+def ungroup(features: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
     # Unbind things
     root_grav_axis = features[..., 0]
     poses_features = features[..., 1:-3]
@@ -159,8 +164,8 @@ def canonicalize_rotation(joints, jointstype="smplxjoints"):
         joints = torch.from_numpy(joints)
         return_np = True
 
-    features = joints_to_rifke(joints, jointstype=jointstype)
-    joints_c = rifke_to_joints(features, jointstype=jointstype)
+    features, _, _ = joints_to_rifke(joints, jointstype=jointstype)
+    joints_c = rifke_to_joints(features)
     if return_np:
         joints_c = joints_c.numpy()
     return joints_c

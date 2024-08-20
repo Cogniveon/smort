@@ -1,12 +1,20 @@
 import os
+from typing import Literal
 import torch
 import numpy as np
 from tqdm.auto import tqdm
 
 
-def loop_interx(base_dir: str, exclude: list[str] = [], device=torch.device("cpu")):
+def loop_interx(
+    base_dir: str,
+    include_only: Literal["all"] | list[str] = "all",
+    exclude: list[str] = [],
+    device=torch.device("cpu"),
+):
     pbar = tqdm(os.listdir(f"{base_dir}/motions"))
     for scene_id in pbar:
+        if include_only != "all" and scene_id not in include_only:
+            continue
         with open(f"{base_dir}/texts/{str(scene_id)}.txt", "r") as annotation:
             texts = []
             for line in annotation.readlines():

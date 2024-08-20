@@ -14,6 +14,7 @@ dependencies = [
     "pandas",
     "einops",
     "torch",
+    "transformers",
     "pytorch_lightning",
     "torchvision",
     "matplotlib",
