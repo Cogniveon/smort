@@ -45,9 +45,9 @@ def compute_rifke(cfg: DictConfig):
         # joints[..., 0] *= -1
         # joints_m = swap_left_right(joints)
         assert len(motions) == 2, f"Expected 2 motions, got {len(motions)}"
-        
+
         reactor_motion, actor_motion = motions
-        
+
         smplx_model = SMPLX(
             model_path="deps/smplx/SMPLX_NEUTRAL.npz",
             num_betas=10,
@@ -68,10 +68,10 @@ def compute_rifke(cfg: DictConfig):
                     device=device,
                 ),
             )
-        
+
         reactor_joints = reactor_joints[:, : smplx_model.NUM_JOINTS, :]
         reactor_feats, _, _ = joints_to_rifke(reactor_joints)
-        
+
         with torch.no_grad():
             output = smplx_model(
                 **actor_motion,
@@ -84,18 +84,19 @@ def compute_rifke(cfg: DictConfig):
                     device=device,
                 ),
             )
-        
-        actor_joints = actor_joints[:, : smplx_model.NUM_JOINTS, :]
 
+        actor_joints = actor_joints[:, : smplx_model.NUM_JOINTS, :]
 
         actor_feats, _, _ = joints_to_rifke(
             actor_joints,
         )
 
-        scene_motions = torch.stack([
-            reactor_feats,
-            actor_feats,
-        ])
+        scene_motions = torch.stack(
+            [
+                reactor_feats,
+                actor_feats,
+            ]
+        )
         assert (
             scene_motions.shape[-1] == 163
         ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"

@@ -189,7 +189,7 @@ class SingleMotionRenderer:
             spline_line.set_3d_properties(np.zeros_like(trajectory[left:right, 0]))
             initialized = True
 
-        fig.tight_layout()
+        # fig.tight_layout()
         frames = joints.shape[0]
         anim = FuncAnimation(fig, update, frames=frames, interval=1000 / fps, repeat=False)  # type: ignore
 
@@ -368,7 +368,7 @@ class SceneRenderer:
 
             root1 = skeleton1[0]
             root2 = skeleton2[0]
-            center = ((root1 + root2) / 2)
+            center = (root1 + root2) / 2
             SingleMotionRenderer.update_camera(
                 ax,
                 center,
@@ -435,7 +435,7 @@ class SceneRenderer:
 
             initialized = True
 
-        fig.tight_layout()
+        # fig.tight_layout()
         frames = min(joints1.shape[0], joints2.shape[0])
         anim = FuncAnimation(fig, update, frames=frames, interval=1000 / fps, repeat=False)  # type: ignore
 

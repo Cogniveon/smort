@@ -9,13 +9,12 @@ from torch import Tensor
 from smotdm.geometry import axis_angle_rotation, matrix_to_axis_angle
 from smotdm.joints import INFOS
 
+
 def feats_to_joints(features: Tensor) -> Tensor:
     root_grav_axis, poses_features, vel_angles, vel_trajectory_local = ungroup(features)
     angles = torch.cumsum(vel_angles[..., :], dim=-1)
     rotations = axis_angle_rotation("Z", angles)[..., :2, :2]
-    poses_local = rearrange(
-        poses_features, "... (joints xyz) -> ... joints xyz", xyz=3
-    )
+    poses_local = rearrange(poses_features, "... (joints xyz) -> ... joints xyz", xyz=3)
 
     # Rotate the poses
     poses = torch.einsum("...lj,...jk->...lk", poses_local[..., [0, 1]], rotations)
@@ -29,6 +28,7 @@ def feats_to_joints(features: Tensor) -> Tensor:
     poses[..., :, 2] += root_grav_axis[..., None, [0]]
     poses[..., :, [0, 1]] += trajectory[..., None, [0, 1]]
     return poses
+
 
 def joints_to_feats(
     joints: Tensor,

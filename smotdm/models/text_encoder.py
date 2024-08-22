@@ -28,7 +28,7 @@ class TextToEmb(nn.Module):
         self.text_encoded_dim = self.text_model.config.hidden_size
 
         if mean_pooling:
-            self.forward = self.forward_pooling # type: ignore
+            self.forward = self.forward_pooling  # type: ignore
 
         # put it in eval mode by default
         self.eval()

@@ -1,8 +1,42 @@
 import os
-from typing import Literal
+from typing import Literal, Optional
 import torch
 import numpy as np
 from tqdm.auto import tqdm
+from smplx import SMPLX
+
+
+def get_smplx_model(
+    batch_size: Optional[int] = None,
+    device: Optional[torch.device] = torch.device("cpu"),
+):
+    return SMPLX(
+        model_path="deps/smplx/SMPLX_NEUTRAL.npz",
+        num_betas=10,
+        use_pca=False,
+        use_face_contour=True,
+        batch_size=batch_size if batch_size is not None else 1,
+    ).to(device)
+
+
+@torch.no_grad()
+def compute_joints(
+    smplx_model: SMPLX,
+    smplx_params: dict,
+    device: Optional[torch.device] = torch.device("cpu"),
+) -> torch.Tensor:
+    smplx_model.to(device)
+    output = smplx_model(
+        **smplx_params,
+    )
+
+    return torch.matmul(
+        output.joints,
+        torch.tensor(
+            [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]],
+            device=device,
+        ),
+    )[:, : smplx_model.NUM_JOINTS, :]
 
 
 def loop_interx(
@@ -14,6 +48,8 @@ def loop_interx(
     pbar = tqdm(os.listdir(f"{base_dir}/motions"))
     for scene_id in pbar:
         if include_only != "all" and scene_id not in include_only:
+            continue
+        if scene_id in exclude:
             continue
         with open(f"{base_dir}/texts/{str(scene_id)}.txt", "r") as annotation:
             texts = []

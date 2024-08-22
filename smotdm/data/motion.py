@@ -17,7 +17,7 @@ class MotionLoader:
         self.reference_angles = {}
         self.normalizer = normalizer
         self.nfeats = nfeats
-    
+
     def __call__(self, scene_id: str, i: int, start: float, end: float):
         begin = int(start * self.fps)
         end = int(end * self.fps)
@@ -88,8 +88,8 @@ class MotionDataset(Dataset):
         self.max_seconds = max_seconds
 
         # Filter the motions based on the duration
-        motions['start'] = pd.to_numeric(motions['start'])
-        motions['end'] = pd.to_numeric(motions['end'])
+        motions["start"] = pd.to_numeric(motions["start"])
+        motions["end"] = pd.to_numeric(motions["end"])
         motions["duration"] = motions["end"] - motions["start"]
         filtered_motions = motions[
             (motions["duration"] >= self.min_seconds)
