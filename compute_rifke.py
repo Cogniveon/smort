@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 
 from smotdm.geometry import axis_angle_rotation
-from smotdm.rifke import joints_to_rifke
+from smotdm.rifke import get_forward_direction, joints_to_feats, joints_to_rifke
+from smotdm.utils import compute_joints, get_smplx_model
 
 logger = logging.getLogger(__name__)
 
@@ -47,49 +48,26 @@ def compute_rifke(cfg: DictConfig):
         assert len(motions) == 2, f"Expected 2 motions, got {len(motions)}"
 
         reactor_motion, actor_motion = motions
+        smplx_model = get_smplx_model(reactor_motion["body_pose"].shape[0], device=device)
 
-        smplx_model = SMPLX(
-            model_path="deps/smplx/SMPLX_NEUTRAL.npz",
-            num_betas=10,
-            use_pca=False,
-            use_face_contour=True,
-            batch_size=reactor_motion["body_pose"].shape[0],
-        ).to(device)
-
-        with torch.no_grad():
-            output = smplx_model(
-                **reactor_motion,
-                return_full_pose=True,
-            )
-            reactor_joints = torch.matmul(
-                output.joints,
-                torch.tensor(
-                    [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]],
-                    device=device,
-                ),
-            )
-
-        reactor_joints = reactor_joints[:, : smplx_model.NUM_JOINTS, :]
-        reactor_feats, _, _ = joints_to_rifke(reactor_joints)
-
-        with torch.no_grad():
-            output = smplx_model(
-                **actor_motion,
-                return_full_pose=True,
-            )
-            actor_joints = torch.matmul(
-                output.joints,
-                torch.tensor(
-                    [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]],
-                    device=device,
-                ),
-            )
-
-        actor_joints = actor_joints[:, : smplx_model.NUM_JOINTS, :]
-
-        actor_feats, _, _ = joints_to_rifke(
-            actor_joints,
+        j1 = compute_joints(
+            smplx_model,
+            reactor_motion,
+            device,
         )
+
+        j2 = compute_joints(
+            smplx_model,
+            actor_motion,
+            device,
+        )
+        
+        translation = j1[..., 0, :].clone()
+        forward = get_forward_direction(j1, jointstype="smplxjoints")
+        angles = torch.atan2(*(forward.transpose(0, -1))).transpose(0, -1)
+
+        reactor_feats = joints_to_feats(j1, translation, angles)
+        actor_feats = joints_to_feats(j2, translation, angles)
 
         scene_motions = torch.stack(
             [
@@ -98,7 +76,7 @@ def compute_rifke(cfg: DictConfig):
             ]
         )
         assert (
-            scene_motions.shape[-1] == 163
+            scene_motions.shape[-1] == 166
         ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"
 
         num_frames = scene_motions[0].shape[0]
