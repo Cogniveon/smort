@@ -18,6 +18,26 @@ logger.setLevel(logging.ERROR)
 
 colors = ("black", "magenta", "red", "green", "blue")
 
+#  0: 'pelvis',
+#  1: 'left_hip',
+#  2: 'right_hip',
+#  3: 'spine1',
+#  4: 'left_knee',
+#  5: 'right_knee',
+#  6: 'spine2',
+#  7: 'left_ankle',
+#  8: 'right_ankle',
+#  9: 'spine3',
+# 10: 'left_foot',
+# 11: 'right_foot',
+# 12: 'neck',
+# 13: 'left_collar',
+# 14: 'right_collar',
+# 15: 'head',
+# 16: 'left_shoulder',
+# 17: 'right_shoulder',
+# 18: 'left_elbow',
+# 19: 'right_elbow',
 KINEMATIC_TREES = {
     "smplxjoints": [
         [0, 3, 6, 9, 12, 15],
@@ -197,8 +217,8 @@ class SingleMotionRenderer:
         ax.set_yticklabels([])
         ax.set_zticklabels([])
 
-        ax.set_axis_off()
-        ax.grid(b=False)
+        # ax.set_axis_off()
+        # ax.grid(b=False)
 
         ax.set_title(title, loc="center", wrap=True)
         return ax
@@ -348,9 +368,10 @@ class SceneRenderer:
 
             root1 = skeleton1[0]
             root2 = skeleton2[0]
+            center = ((root1 + root2) / 2)
             SingleMotionRenderer.update_camera(
                 ax,
-                np.concatenate((root1, root2), axis=0),
+                center,
             )
 
             hcolors1 = colors1
