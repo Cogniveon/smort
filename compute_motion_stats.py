@@ -5,8 +5,9 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
 from tqdm.auto import tqdm
-from smotdm.data.motion import MotionDataset, MotionLoader, Normalizer
+from smotdm.data.motion_dataset import MotionDataset, MotionLoader
 from smotdm.data.collate import collate_text_motion
+from smotdm.data.normalizer import Normalizer
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ def compute_motion_stats(cfg: DictConfig):
     device = torch.device(cfg.device)
 
     dataset = MotionDataset(
-        dataset_file, motions_file, MotionLoader(dataset_file, 20.0), None, device=device
+        dataset_file, motions_file, MotionLoader(dataset_file, 20.0), device=device
     )
     loader = DataLoader(
         dataset, batch_size=batch_size, collate_fn=collate_text_motion, num_workers=4

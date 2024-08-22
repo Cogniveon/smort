@@ -3,10 +3,35 @@ from typing import Dict
 import torch
 import torch.nn as nn
 from torch import Tensor
+import numpy as np
 
 from einops import repeat
 
-from smotdm.models.pe import PositionalEncoding
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000, batch_first=False) -> None:
+        super().__init__()
+        self.batch_first = batch_first
+
+        self.dropout = nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model)
+        )
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer("pe", pe, persistent=False)
+
+    def forward(self, x: Tensor) -> Tensor:
+        if self.batch_first:
+            x = x + self.pe.permute(1, 0, 2)[:, : x.shape[1], :]
+        else:
+            x = x + self.pe[: x.shape[0], :]
+        return self.dropout(x)
+
 
 # From https://github.com/Mathux/TMR/blob/master/src/model/actor.py
 class ACTORStyleEncoder(nn.Module):
@@ -60,7 +85,7 @@ class ACTORStyleEncoder(nn.Module):
         tokens = repeat(self.tokens, "nbtoken dim -> bs nbtoken dim", bs=bs)
         xseq = torch.cat((tokens, x), 1)
 
-        token_mask = torch.ones((bs, self.nbtokens), dtype=bool, device=device) # type: ignore
+        token_mask = torch.ones((bs, self.nbtokens), dtype=bool, device=device)  # type: ignore
         aug_mask = torch.cat((token_mask, mask), 1)
 
         # add positional encoding

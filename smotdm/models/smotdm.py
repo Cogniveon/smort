@@ -5,7 +5,7 @@ import torch
 from torch.optim.adamw import AdamW
 from smotdm.data.collate import length_to_mask
 from smotdm.models.losses import KLLoss
-from smotdm.models.motion_encoder import ACTORStyleDecoder, ACTORStyleEncoder
+from smotdm.models.modules import ACTORStyleDecoder, ACTORStyleEncoder
 
 
 class SMOTDM(LightningModule):
