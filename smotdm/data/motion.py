@@ -1,4 +1,6 @@
 import os
+from random import randint
+from typing import Optional
 import h5py
 import torch
 
@@ -6,34 +8,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 from smotdm.data.collate import collate_text_motion
-
-
-class MotionLoader:
-    def __init__(self, dataset_file: str, fps, normalizer=None, nfeats=None):
-        self.fps = fps
-        self.dataset_file = dataset_file
-        self.motions = {}
-        self.reference_translations = {}
-        self.reference_angles = {}
-        self.normalizer = normalizer
-        self.nfeats = nfeats
-
-    def __call__(self, scene_id: str, i: int, start: float, end: float):
-        begin = int(start * self.fps)
-        end = int(end * self.fps)
-        if scene_id not in self.motions:
-            with h5py.File(self.dataset_file, "r") as f:
-                motions = f[str(f"motions/{scene_id}")]
-                assert type(motions) == h5py.Dataset
-                motion = torch.from_numpy(motions[i]).to(torch.float)
-                if self.normalizer is not None:
-                    motion = self.normalizer(motions[i])
-                self.motions[f"{scene_id}_{i}"] = motion
-
-        motion = self.motions[f"{scene_id}_{i}"][begin:end]
-        x_dict = {"x": motion, "length": len(motion)}
-        return x_dict
-
+from smotdm.data.loader import MotionLoader
 
 class Normalizer:
     def __init__(self, base_dir: str, eps: float = 1e-12, disable: bool = False):
@@ -47,8 +22,8 @@ class Normalizer:
             self.load()
 
     def load(self):
-        self.mean = torch.load(self.mean_path)
-        self.std = torch.load(self.std_path)
+        self.mean = torch.load(self.mean_path, weights_only=True)
+        self.std = torch.load(self.std_path, weights_only=True)
 
     def save(self, mean, std):
         os.makedirs(self.base_dir, exist_ok=True)
@@ -76,7 +51,6 @@ class MotionDataset(Dataset):
         motion_loader: MotionLoader,
         min_seconds: float = 2.0,
         max_seconds: float = 30.0,
-        normalizer: Normalizer | None = None,
         device: torch.device = torch.device("cpu"),
     ):
         self.collate_fn = collate_text_motion
@@ -129,3 +103,60 @@ class MotionDataset(Dataset):
             # "sent_emb": sent_emb,
         }
         return output
+
+
+class TextMotionDataset(Dataset):
+    def __init__(
+        self,
+        path: str,
+        device: torch.device = torch.device("cpu"),
+    ):
+        self.collate_fn = collate_text_motion
+        self.dataset_path = path
+        self.normalizer = Normalizer("deps/interx")
+        self.device = device
+
+    def __len__(self):
+        with h5py.File(self.dataset_path, "r") as f:
+            motions_dataset = f["motions"]
+            assert type(motions_dataset) == h5py.Group
+            return len(list(motions_dataset.keys()))
+
+    def __getitem__(self, index):
+        with h5py.File(self.dataset_path, "r") as f:
+            motions_dataset = f["motions"]
+            assert type(motions_dataset) == h5py.Group
+            scene_id = list(motions_dataset.keys())[index]
+
+            scene_dataset = motions_dataset[f"{scene_id}"]
+            assert type(scene_dataset) == h5py.Dataset
+
+            texts_dataset = f[f"texts/{scene_id}"]
+            assert type(texts_dataset) == h5py.Dataset
+
+            text = texts_dataset[randint(0, 2)]
+
+            reactor_motion = scene_dataset[0]
+            actor_motion = scene_dataset[1]
+            reactor_x_dict = {
+                "x": torch.tensor(
+                    reactor_motion, dtype=torch.float32, device=self.device
+                ),
+                "length": len(reactor_motion),
+            }
+            actor_x_dict = {
+                "x": torch.tensor(
+                    actor_motion, dtype=torch.float32, device=self.device
+                ),
+                "length": len(actor_motion),
+            }
+            text_x_dict = {
+                "x": torch.tensor(text, dtype=torch.float32, device=self.device),
+                "length": len(text),
+            }
+            return {
+                "reactor_x_dict": reactor_x_dict,
+                "actor_x_dict": actor_x_dict,
+                "text_x_dict": text_x_dict,
+            }
+

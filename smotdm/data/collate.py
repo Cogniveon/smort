@@ -36,7 +36,7 @@ def collate_x_dict(data: List, *, device: Optional[str] = None) -> Dict:
     x = collate_tensor_with_padding([x_dict["x"] for x_dict in data])
     if device is not None:
         x = x.to(device)
-    length = [len(d) for d in data]
+    length = [x_dict["length"] for x_dict in data]
     mask = length_to_mask(length, device=x.device)
     batch = {"x": x, "length": length, "mask": mask}
     return batch

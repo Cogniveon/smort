@@ -5,7 +5,6 @@ import numpy as np
 from tqdm.auto import tqdm
 from smplx import SMPLX
 
-
 def get_smplx_model(
     batch_size: Optional[int] = None,
     device: Optional[torch.device] = torch.device("cpu"),
@@ -41,11 +40,14 @@ def compute_joints(
 
 def loop_interx(
     base_dir: str,
-    include_only: Literal["all"] | list[str] = "all",
+    include_only: Literal["all"] | list[str] | int = "all",
     exclude: list[str] = [],
     device=torch.device("cpu"),
 ):
+    if type(include_only) == int:
+        include_only = os.listdir(f"{base_dir}/motions")[:include_only]
     pbar = tqdm(os.listdir(f"{base_dir}/motions"))
+    assert type(include_only) == str or type(include_only) == list, type(include_only)
     for scene_id in pbar:
         if include_only != "all" and scene_id not in include_only:
             continue

@@ -21,7 +21,7 @@ def compute_motion_stats(cfg: DictConfig):
     device = torch.device(cfg.device)
 
     dataset = MotionDataset(
-        dataset_file, motions_file, MotionLoader(dataset_file, 20.0), device=device
+        dataset_file, motions_file, MotionLoader(dataset_file, 20.0), None, device=device
     )
     loader = DataLoader(
         dataset, batch_size=batch_size, collate_fn=collate_text_motion, num_workers=4

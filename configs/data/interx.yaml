@@ -1,7 +1,2 @@
-defaults:
-  - motion_loader: guoh3dfeats
-  - _self_
-
-_target_: src.data.text_motion.TextMotionDataset
-
-preload: true
+# defaults:
+#   - _self_

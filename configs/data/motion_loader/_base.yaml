@@ -1,8 +1,0 @@
-_target_: src.data.motion.MotionLoader
-
-base_dir: ???
-
-normalizer:
-  _target_: src.data.motion.Normalizer
-  base_dir: stats/${hydra:runtime.choices.data}/${hydra:runtime.choices.data/motion_loader}
-  eps: 1e-12
