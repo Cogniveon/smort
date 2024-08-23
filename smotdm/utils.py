@@ -116,6 +116,7 @@ def loop_interx(
                     }
                 )
 
-            assert end is not None
+            if end is None:
+                continue
             pbar.set_postfix(dict(scene_id=scene_id))
             yield scene_id, motions, end, texts
