@@ -12,8 +12,10 @@ text_encoder:
   modelpath: distilbert/distilbert-base-uncased
 
 fps: 20.0
-# ids: 1000
-ids: all
+min_seconds: 2.0
+max_seconds: 30.0
+ids: 100
+# ids: all
 # ids:
 #   - G001T000A001R005
 #   - G001T003A019R024

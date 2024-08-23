@@ -20,7 +20,10 @@ class TextToEmb(nn.Module):
 
         # Tokenizer
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        self.tokenizer = AutoTokenizer.from_pretrained(modelpath, clean_up_tokenization_spaces=True,)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            modelpath,
+            clean_up_tokenization_spaces=True,
+        )
 
         # Text model
         self.text_model = AutoModel.from_pretrained(modelpath)
@@ -81,7 +84,7 @@ class TextToEmb(nn.Module):
 
         # Mean Pooling - Take attention mask into account for correct averaging
         token_embeddings = output["last_hidden_state"]
-        
+
         assert type(attention_mask) == Tensor
         input_mask_expanded = (
             attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()

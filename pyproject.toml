@@ -16,6 +16,7 @@ dependencies = [
     "torch",
     "transformers",
     "pytorch_lightning",
+    "torchmetrics",
     "torchvision",
     "matplotlib",
     "plotly",
