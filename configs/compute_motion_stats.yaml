@@ -3,6 +3,6 @@ defaults:
   - _self_
 
 motions_file: deps/interx/motions_fps_20_0.csv
-dataset_file: deps/interx/dataset_tiny.h5
+dataset_file: deps/interx/dataset_med.h5
 device: cpu
 batch_size: 100

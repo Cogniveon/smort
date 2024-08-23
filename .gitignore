@@ -3,6 +3,7 @@ deps
 outputs
 logs
 lightning_logs
+somefile_that_i_dont_want_to_share.txt
 
 # Created by https://www.toptal.com/developers/gitignore/api/windows,macos,linux,python,latex
 # Edit at https://www.toptal.com/developers/gitignore?templates=windows,macos,linux,python,latex

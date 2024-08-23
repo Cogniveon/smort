@@ -4,18 +4,40 @@ import torch
 import numpy as np
 from tqdm.auto import tqdm
 from smplx import SMPLX
+from typing import Optional
+import torch
+
 
 def get_smplx_model(
     batch_size: Optional[int] = None,
     device: Optional[torch.device] = torch.device("cpu"),
-):
-    return SMPLX(
-        model_path="deps/smplx/SMPLX_NEUTRAL.npz",
+    model_path: str = "deps/smplx/SMPLX_NEUTRAL.npz",
+) -> SMPLX:
+    """
+    Returns an instance of the SMPLX model, configured with the given batch size and device.
+    
+    Args:
+        batch_size (Optional[int]): The batch size for the model. Defaults to 1 if not specified.
+        device (Optional[torch.device]): The device to run the model on (CPU or GPU). Defaults to CPU.
+        model_path (str): The path to the SMPLX model file. Defaults to 'deps/smplx/SMPLX_NEUTRAL.npz'.
+    
+    Returns:
+        SMPLX: The configured SMPLX model instance.
+    """
+    # Initialize the SMPLX model
+    smplx_model = SMPLX(
+        model_path=model_path,
         num_betas=10,
         use_pca=False,
         use_face_contour=True,
         batch_size=batch_size if batch_size is not None else 1,
-    ).to(device)
+    )
+    
+    # Move the model to the specified device
+    smplx_model.to(device)
+    
+    return smplx_model
+
 
 
 @torch.no_grad()
@@ -25,17 +47,16 @@ def compute_joints(
     device: Optional[torch.device] = torch.device("cpu"),
 ) -> torch.Tensor:
     smplx_model.to(device)
-    output = smplx_model(
-        **smplx_params,
-    )
+    
+    output = smplx_model(**smplx_params)
 
-    return torch.matmul(
-        output.joints,
-        torch.tensor(
-            [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]],
-            device=device,
-        ),
-    )[:, : smplx_model.NUM_JOINTS, :]
+    transform_matrix = torch.tensor(
+        [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]],
+        device=device,
+    )
+    transformed_joints = torch.matmul(output.joints, transform_matrix)
+    
+    return transformed_joints[:, : smplx_model.NUM_JOINTS, :]
 
 
 def loop_interx(
