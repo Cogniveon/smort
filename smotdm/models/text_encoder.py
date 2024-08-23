@@ -8,7 +8,10 @@ import torch.nn.functional as F
 
 class TextToEmb(nn.Module):
     def __init__(
-        self, modelpath: str, mean_pooling: bool = False, device: str = "cpu"
+        self,
+        modelpath: str,
+        mean_pooling: bool = False,
+        device: torch.device = torch.device("cpu"),
     ) -> None:
         super().__init__()
 

@@ -3,9 +3,9 @@ defaults:
   - _self_
 
 base_dir: deps/interx
-dataset_file: deps/interx/dataset_med.h5
+dataset_file: deps/interx/dataset.h5
 motions_path: deps/interx/motions_fps_20_0.csv
-device: mps:0
+device: cuda
 
 text_encoder:
   _target_: smotdm.models.text_encoder.TextToEmb
@@ -14,8 +14,8 @@ text_encoder:
 fps: 20.0
 min_seconds: 2.0
 max_seconds: 30.0
-ids: 100
-# ids: all
+# ids: 100
+ids: all
 # ids:
 #   - G001T000A001R005
 #   - G001T003A019R024

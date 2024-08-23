@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 
 from torchmetrics import Metric
 
+
 class MeanStdMetric(Metric):
     def __init__(self, nfeats=166):
         super().__init__()
         self.nfeats = nfeats
         self.add_state("sums", default=torch.zeros(self.nfeats), dist_reduce_fx="sum")
-        self.add_state("sum_of_squares", default=torch.zeros(self.nfeats), dist_reduce_fx="sum")
+        self.add_state(
+            "sum_of_squares", default=torch.zeros(self.nfeats), dist_reduce_fx="sum"
+        )
         self.add_state("count", default=torch.zeros(1), dist_reduce_fx="sum")
 
     def update(self, feature_tensors: torch.Tensor, num_frames: int) -> None:
@@ -33,11 +36,11 @@ class MeanStdMetric(Metric):
 
         self.count += num_frames
         self.sums += feature_tensors.sum(dim=0)
-        self.sum_of_squares += (feature_tensors ** 2).sum(dim=0)
+        self.sum_of_squares += (feature_tensors**2).sum(dim=0)
 
     def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
         mean = self.sums / self.count
-        variance = (self.sum_of_squares / self.count) - (mean ** 2)
+        variance = (self.sum_of_squares / self.count) - (mean**2)
         std = torch.sqrt(variance)
         return mean, std
 
@@ -106,7 +109,7 @@ def compute_feats(cfg: DictConfig):
 
             del j1, j2, forward, translation, angles
             torch.cuda.empty_cache()
-            
+
             scene_motions = torch.stack(
                 [
                     reactor_feats,
@@ -116,7 +119,7 @@ def compute_feats(cfg: DictConfig):
             assert (
                 scene_motions.shape[-1] == 166
             ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"
-            
+
             # Update mean and standard deviation metrics
             mean_std.update(scene_motions[0], reactor_feats.shape[0])
             mean_std.update(scene_motions[1], actor_feats.shape[0])
@@ -155,13 +158,13 @@ def compute_feats(cfg: DictConfig):
             errored_scenes.append(scene_id)
             torch.cuda.empty_cache()
             continue
-    
+
     mean_value, std_value = mean_std.compute()
-    
-    stats_dataset = dataset.create_group('stats')
-    stats_dataset.create_dataset('mean', data=mean_value.detach().cpu().numpy())
-    stats_dataset.create_dataset('std', data=std_value.detach().cpu().numpy())
-    
+
+    stats_dataset = dataset.create_group("stats")
+    stats_dataset.create_dataset("mean", data=mean_value.detach().cpu().numpy())
+    stats_dataset.create_dataset("std", data=std_value.detach().cpu().numpy())
+
     assert motions_df is not None
     motions_df.to_csv(cfg.motions_path)
     dataset.close()

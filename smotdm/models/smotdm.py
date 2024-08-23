@@ -134,9 +134,11 @@ class SMOTDM(LightningModule):
         t_motions, t_latents, t_dists = self(
             text_x_dict, "text", mask=mask, return_all=True
         )
+        # actor -> reactor motion
         a_motions, a_latents, a_dists = self(
             actor_x_dict, "actor", mask=mask, return_all=True
         )
+        # motion -> motion
         m_motions, m_latents, m_dists = self(
             reactor_x_dict, "reactor", mask=mask, return_all=True
         )

@@ -53,4 +53,4 @@ class InfoNCE_with_filtering:
         return total_loss
 
     def __repr__(self):
-        return f"Constrastive(temp={self.temp})" # type: ignore
+        return f"Constrastive(temp={self.temp})"  # type: ignore

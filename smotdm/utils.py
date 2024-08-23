@@ -74,7 +74,11 @@ def loop_interx(
     elif type(include_only) == int:
         motions = os.listdir(f"{base_dir}/motions")[:include_only]
     elif type(include_only) == ListConfig:
-        motions = [x for x in os.listdir(f"{base_dir}/motions") if x in include_only and x not in exclude]
+        motions = [
+            x
+            for x in os.listdir(f"{base_dir}/motions")
+            if x in include_only and x not in exclude
+        ]
     pbar = tqdm(motions, total=len(motions))
     for scene_id in pbar:
         with open(f"{base_dir}/texts/{str(scene_id)}.txt", "r") as annotation:
@@ -90,28 +94,38 @@ def loop_interx(
             ]:
                 data = np.load(file)
                 num_frames = data["pose_body"].shape[0]
-                
+
                 if num_frames < math.floor(min_seconds * fps):
                     continue
                 if end is None:
                     end = math.floor(max_seconds * fps)
-                
+
                 motions.append(
                     {
                         "body_pose": torch.tensor(
-                            data["pose_body"][0:end, ...], dtype=torch.float32, device=device
+                            data["pose_body"][0:end, ...],
+                            dtype=torch.float32,
+                            device=device,
                         ),
                         "left_hand_pose": torch.tensor(
-                            data["pose_lhand"][0:end, ...], dtype=torch.float32, device=device
+                            data["pose_lhand"][0:end, ...],
+                            dtype=torch.float32,
+                            device=device,
                         ),
                         "right_hand_pose": torch.tensor(
-                            data["pose_rhand"][0:end, ...], dtype=torch.float32, device=device
+                            data["pose_rhand"][0:end, ...],
+                            dtype=torch.float32,
+                            device=device,
                         ),
                         "transl": torch.tensor(
-                            data["trans"][0:end, ...], dtype=torch.float32, device=device
+                            data["trans"][0:end, ...],
+                            dtype=torch.float32,
+                            device=device,
                         ),
                         "global_orient": torch.tensor(
-                            data["root_orient"][0:end, ...], dtype=torch.float32, device=device
+                            data["root_orient"][0:end, ...],
+                            dtype=torch.float32,
+                            device=device,
                         ),
                     }
                 )
