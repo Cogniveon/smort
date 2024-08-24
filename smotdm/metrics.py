@@ -14,7 +14,7 @@ class MeanStdMetric(Metric):
         )
         self.add_state("count", default=torch.zeros(1), dist_reduce_fx="sum")
 
-    def update(self, feature_tensors: torch.Tensor, num_frames: int) -> None:
+    def update(self, feature_tensors: torch.Tensor, count: int) -> None:
         if feature_tensors.shape[-1] != self.nfeats:
             raise ValueError("Feature dim does not match!")
  
@@ -25,7 +25,7 @@ class MeanStdMetric(Metric):
             padding_repeated = einops.repeat(padding, "x f -> b x f", b=feature_tensors.shape[0])
             feature_tensors = torch.cat([feature_tensors, padding_repeated], dim=1)
         
-        self.count += num_frames
+        self.count += count
         self.sums += feature_tensors.sum(dim=0)
         self.sum_of_squares += (feature_tensors**2).sum(dim=0)
 

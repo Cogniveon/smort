@@ -94,7 +94,7 @@ def compute_feats(cfg: DictConfig):
             ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"
 
             # Update mean and standard deviation metrics
-            mean_std.update(scene_motions, scene_motions.shape[1])
+            mean_std.update(scene_motions, scene_motions.shape[0])
 
             motions_df = pd.concat(
                 [
