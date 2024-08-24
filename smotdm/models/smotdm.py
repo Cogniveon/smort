@@ -1,7 +1,5 @@
-from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
-import numpy as np
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
@@ -137,7 +135,7 @@ class SMOTDM(LightningModule):
 
         return motions
 
-    def compute_loss(self, batch: Dict) -> Dict:
+    def compute_loss(self, batch: Dict, return_motions: bool = False) -> Dict:
         text_x_dict = batch["text_x_dict"]
         actor_x_dict = batch["actor_x_dict"]
         reactor_x_dict = batch["reactor_x_dict"]
@@ -192,6 +190,9 @@ class SMOTDM(LightningModule):
         losses["loss"] = sum(
             self.lmd[x] * val for x, val in losses.items() if x in self.lmd
         )
+        
+        if return_motions:
+            return losses, m_motions, ref_motions # type: ignore
         return losses
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
@@ -226,17 +227,13 @@ class SMOTDM(LightningModule):
         )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
-        if batch_idx == 0:
-            viz_batch = batch['reactor_x_dict']
-            viz_batch['x'] = viz_batch['x'][:1, ...]
-            viz_batch['mask'] = viz_batch['mask'][:1, ...]
-            motions, latents, dists = self(
-                viz_batch, "reactor", mask=viz_batch["mask"], return_all=True
-            )
-            self.norm_and_render_motion(motions[0], 'viz.mp4')
-            
         bs = len(batch["reactor_x_dict"]["x"])
-        losses = self.compute_loss(batch)
+        losses, motions, orig_motions = self.compute_loss(batch, return_motions=True)
+        
+        if batch_idx == 0:
+            self.norm_and_render_motion(motions[0], 'viz.mp4')
+            self.norm_and_render_motion(orig_motions[0], 'gt.mp4')
+            
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]

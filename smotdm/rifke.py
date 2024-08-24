@@ -21,7 +21,6 @@ def feats_to_joints(features: Tensor) -> Tensor:
 
     # Rotate the vel_trajectory
     vel_trajectory = torch.einsum("...j,...jk->...k", vel_trajectory_local, rotations)
-    # Remove the dummy last velocity and integrate the trajectory
     trajectory = torch.cumsum(vel_trajectory[..., :, :], dim=-2)
 
     poses[..., :, 2] += root_grav_axis[..., None, [0]]
