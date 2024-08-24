@@ -151,7 +151,6 @@ class SMOTDM(LightningModule):
         # fmt: off
         losses["recons"] = (
             + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
-            # + self.reconstruction_loss_fn(a_motions, ref_motions) # actor -> motion
             + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
         )
         # fmt: on
