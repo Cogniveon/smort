@@ -1,10 +1,10 @@
 import logging
-
 import sys
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import TQDMProgressBar as OriginalTQDMProgressBar
 
+import pytorch_lightning as pl
 import tqdm
+from pytorch_lightning.callbacks import \
+    TQDMProgressBar as OriginalTQDMProgressBar
 
 
 # from https://stackoverflow.com/questions/38543506/change-logging-print-function-to-tqdm-write-so-logging-doesnt-interfere-wit

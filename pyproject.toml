@@ -21,6 +21,7 @@ dependencies = [
     "matplotlib",
     "plotly",
     "gdown",
+    "boto3",
     "awscli",
     "scipy",
     "hydra-core",

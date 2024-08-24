@@ -32,7 +32,7 @@ class SMOTDM(LightningModule):
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters(ignore=['dataset'])
+        self.save_hyperparameters(ignore=["dataset"])
 
         # sampling parameters
         self.vae = vae
@@ -77,7 +77,7 @@ class SMOTDM(LightningModule):
         # lambda weighting for the losses
         self.lmd = lmd
         self.lr = lr
-        
+
         text_embeds = TextToEmb(
             "distilbert/distilbert-base-uncased",
         )(
@@ -224,8 +224,8 @@ class SMOTDM(LightningModule):
 
     def on_train_epoch_end(self) -> None:
         super().on_train_epoch_end()
-        self.viz_test_batch['x'] = self.viz_test_batch['x'].to(self.device)
-        self.viz_test_batch['mask'] = self.viz_test_batch['mask'].to(self.device)
+        self.viz_test_batch["x"] = self.viz_test_batch["x"].to(self.device)
+        self.viz_test_batch["mask"] = self.viz_test_batch["mask"].to(self.device)
         encoded = self.text_encoder(self.viz_test_batch)
 
         dists = encoded.unbind(1)
@@ -235,13 +235,13 @@ class SMOTDM(LightningModule):
             self.motion_decoder(
                 {
                     "z": latent_vectors,
-                    "mask": self.viz_test_batch['mask'],
+                    "mask": self.viz_test_batch["mask"],
                 }
             ).squeeze(dim=0)
         )
         self.renderer.render_animation_single(
             feats_to_joints(torch.from_numpy(motion)).detach().cpu().numpy(),
-            output=str(Path(self.loggers[0].save_dir) / 'test.mp4') # type: ignore
+            output=str(Path(self.loggers[0].save_dir) / "test.mp4"),  # type: ignore
         )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:

@@ -1,11 +1,10 @@
 import logging
-import os
 
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from smotdm.config import read_config, save_config
+from smotdm.config import save_config
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +19,18 @@ def train(cfg: DictConfig):
 
     pl.seed_everything(cfg.seed)
 
-    logger.info("Loading dataloaders")
-    train_dataset = instantiate(cfg.data)
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=cfg.batch_size,
-        collate_fn=train_dataset.collate_fn,
-        shuffle=True,
-        num_workers=os.cpu_count() or 1,
-        persistent_workers=True,
-    )
+    logger.info("Loading datamodule")
+    data_module = instantiate(cfg.data)
+    data_module.setup("train")
 
     logger.info("Loading model")
-    model = instantiate(cfg.model, dataset=train_dataset)
+    model = instantiate(cfg.model, dataset=data_module.dataset)
 
     logger.info("Training")
     trainer: pl.Trainer = instantiate(cfg.trainer)
-    trainer.fit(model, train_dataloader)
+    trainer.fit(model, data_module)
     logger.info("Training done.")
-    
+
 
 if __name__ == "__main__":
     train()

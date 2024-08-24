@@ -238,7 +238,7 @@ def matrix_to_euler_angles(matrix, convention: str):
     tait_bryan = i0 != i2
     if tait_bryan:
         central_angle = torch.asin(
-            matrix[..., i0, i2] * (-1.0 if i0 - i2 in [-1, 2] else 1.0) # type: ignore
+            matrix[..., i0, i2] * (-1.0 if i0 - i2 in [-1, 2] else 1.0)  # type: ignore
         )
     else:
         central_angle = torch.acos(matrix[..., i0, i0])

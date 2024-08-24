@@ -1,5 +1,6 @@
 defaults:
   - _self_
 
-_target_: smotdm.data.text_motion_dataset.TextMotionDataset
-path: deps/interx/processed/dataset.h5
+_target_: smotdm.data.data_module.InterXDataModule
+dataset_file: deps/interx/processed/dataset_2k.h5
+batch_size: 1

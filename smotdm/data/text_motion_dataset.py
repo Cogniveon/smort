@@ -43,8 +43,8 @@ class TextMotionDataset(Dataset):
             actor_motion = scene_dataset[1]
 
             if self.normalize:
-                mean = f["stats/mean"][()][:reactor_motion.shape[0], :]  # type: ignore
-                std = f["stats/std"][()][:reactor_motion.shape[0], :]  # type: ignore
+                mean = f["stats/mean"][()][: reactor_motion.shape[0], :]  # type: ignore
+                std = f["stats/std"][()][: reactor_motion.shape[0], :]  # type: ignore
 
                 assert type(mean) is np.ndarray
                 assert type(std) is np.ndarray
@@ -82,8 +82,8 @@ class TextMotionDataset(Dataset):
             motion = motion.detach().cpu().numpy()
         assert type(motion) == np.ndarray
         with h5py.File(self.dataset_path, "r") as f:
-            mean = f["stats/mean"][()][:motion.shape[0], :]  # type: ignore
-            std = f["stats/std"][()][:motion.shape[0], :]  # type: ignore
+            mean = f["stats/mean"][()][: motion.shape[0], :]  # type: ignore
+            std = f["stats/std"][()][: motion.shape[0], :]  # type: ignore
 
             assert type(mean) is np.ndarray
             assert type(std) is np.ndarray
