@@ -40,16 +40,16 @@ class SMOTDM(LightningModule):
             dropout=0.1,
             activation="gelu",
         )
-        self.actor_encoder = ACTORStyleEncoder(
-            nfeats=166,
-            vae=True,
-            latent_dim=256,
-            ff_size=1024,
-            num_layers=6,
-            num_heads=4,
-            dropout=0.1,
-            activation="gelu",
-        )
+        # self.actor_encoder = ACTORStyleEncoder(
+        #     nfeats=166,
+        #     vae=True,
+        #     latent_dim=256,
+        #     ff_size=1024,
+        #     num_layers=6,
+        #     num_heads=4,
+        #     dropout=0.1,
+        #     activation="gelu",
+        # )
         self.motion_decoder = ACTORStyleDecoder(
             nfeats=166,
             latent_dim=256,
@@ -80,7 +80,7 @@ class SMOTDM(LightningModule):
     def forward(
         self,
         inputs,
-        input_type: Literal["reactor", "text", "actor"],
+        input_type: Literal["reactor", "text"],
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
         sample_mean: Optional[bool] = None,
@@ -92,8 +92,8 @@ class SMOTDM(LightningModule):
 
         if input_type == "text":
             encoder = self.text_encoder
-        elif input_type == "actor":
-            encoder = self.actor_encoder
+        # elif input_type == "actor":
+        #     encoder = self.actor_encoder
         else:
             encoder = self.motion_encoder
 
@@ -135,10 +135,10 @@ class SMOTDM(LightningModule):
         t_motions, t_latents, t_dists = self(
             text_x_dict, "text", mask=mask, return_all=True
         )
-        # actor -> reactor motion
-        a_motions, a_latents, a_dists = self(
-            actor_x_dict, "actor", mask=mask, return_all=True
-        )
+        # # actor -> reactor motion
+        # a_motions, a_latents, a_dists = self(
+        #     actor_x_dict, "actor", mask=mask, return_all=True
+        # )
         # motion -> motion
         m_motions, m_latents, m_dists = self(
             reactor_x_dict, "reactor", mask=mask, return_all=True
@@ -151,7 +151,7 @@ class SMOTDM(LightningModule):
         # fmt: off
         losses["recons"] = (
             + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
-            + self.reconstruction_loss_fn(a_motions, ref_motions) # actor -> motion
+            # + self.reconstruction_loss_fn(a_motions, ref_motions) # actor -> motion
             + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
         )
         # fmt: on
@@ -166,19 +166,14 @@ class SMOTDM(LightningModule):
 
             losses["kl"] = (
                 self.kl_loss_fn(t_dists, m_dists)  # text_to_motion
-                + self.kl_loss_fn(m_dists, t_dists)  # reactor_to_text
-                + self.kl_loss_fn(a_dists, t_dists)  # actor_to_text
-                + self.kl_loss_fn(t_dists, a_dists)  # text_to_actor
-                + self.kl_loss_fn(a_dists, m_dists)  # actor_to_reactor
-                + self.kl_loss_fn(m_dists, a_dists)  # reactor_to_actor
-                + self.kl_loss_fn(a_dists, ref_dists)  # actor
-                + self.kl_loss_fn(m_dists, ref_dists)  # reactor
+                + self.kl_loss_fn(m_dists, t_dists)  # motion_to_text
+                + self.kl_loss_fn(m_dists, ref_dists)  # motion
                 + self.kl_loss_fn(t_dists, ref_dists)  # text
             )
 
         # Latent manifold loss
         losses["latent_t"] = self.latent_loss_fn(t_latents, m_latents)
-        losses["latent_a"] = self.latent_loss_fn(a_latents, m_latents)
+        # losses["latent_a"] = self.latent_loss_fn(a_latents, m_latents)
 
         # Weighted average of the losses
         losses["loss"] = sum(
