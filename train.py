@@ -1,7 +1,9 @@
 import logging
+
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
+
 from smotdm.config import read_config, save_config
 
 logger = logging.getLogger(__name__)

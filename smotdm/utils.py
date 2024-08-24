@@ -1,13 +1,12 @@
 import math
 import os
 from typing import Literal, Optional
-from omegaconf import ListConfig
-import torch
+
 import numpy as np
-from tqdm.auto import tqdm
-from smplx import SMPLX
-from typing import Optional
 import torch
+from omegaconf import ListConfig
+from smplx import SMPLX
+from tqdm.auto import tqdm
 
 
 def get_smplx_model(

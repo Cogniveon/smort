@@ -1,48 +1,19 @@
 import logging
-import math
 import os
+from pathlib import Path
+
 import h5py
-import torch
 import hydra
-from omegaconf import DictConfig
-from hydra.utils import instantiate
-from torchmetrics import Metric
-
 import pandas as pd
+import torch
+from hydra.utils import instantiate
+from omegaconf import DictConfig
 
+from smotdm.metrics import MeanStdMetric
 from smotdm.rifke import get_forward_direction, joints_to_feats
-from smotdm.utils import compute_joints, get_smplx_model
-from smotdm.utils import loop_interx
+from smotdm.utils import compute_joints, get_smplx_model, loop_interx
 
 logger = logging.getLogger(__name__)
-
-
-from torchmetrics import Metric
-
-
-class MeanStdMetric(Metric):
-    def __init__(self, nfeats=166):
-        super().__init__()
-        self.nfeats = nfeats
-        self.add_state("sums", default=torch.zeros(self.nfeats), dist_reduce_fx="sum")
-        self.add_state(
-            "sum_of_squares", default=torch.zeros(self.nfeats), dist_reduce_fx="sum"
-        )
-        self.add_state("count", default=torch.zeros(1), dist_reduce_fx="sum")
-
-    def update(self, feature_tensors: torch.Tensor, num_frames: int) -> None:
-        if feature_tensors.shape[-1] != self.nfeats:
-            raise ValueError("Feature dim does not match!")
-
-        self.count += num_frames
-        self.sums += feature_tensors.sum(dim=0)
-        self.sum_of_squares += (feature_tensors**2).sum(dim=0)
-
-    def compute(self) -> tuple[torch.Tensor, torch.Tensor]:
-        mean = self.sums / self.count
-        variance = (self.sum_of_squares / self.count) - (mean**2)
-        std = torch.sqrt(variance)
-        return mean, std
 
 
 @hydra.main(config_path="configs", config_name="compute_feats", version_base="1.3")
@@ -50,11 +21,12 @@ def compute_feats(cfg: DictConfig):
     base_dir = cfg.base_dir
     dataset_file = cfg.dataset_file
     device = torch.device(cfg.device)
-    ids = cfg.ids
+    include_only = cfg.include_only
     fps = cfg.fps
     min_seconds = cfg.min_seconds
     max_seconds = cfg.max_seconds
 
+    Path(dataset_file).parent.mkdir(exist_ok=True, parents=True)
     logger.info(f"The processed motions will be stored in this file: {dataset_file}")
 
     if not os.path.exists(base_dir):
@@ -64,7 +36,7 @@ def compute_feats(cfg: DictConfig):
     iterator = loop_interx(
         base_dir,
         device=device,
-        include_only=ids,
+        include_only=include_only,
         fps=fps,
         min_seconds=min_seconds,
         max_seconds=max_seconds,

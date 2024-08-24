@@ -1,9 +1,8 @@
 from typing import Optional
-import torch
 
-from einops import rearrange
 import numpy as np
-
+import torch
+from einops import rearrange
 from torch import Tensor
 
 from smotdm.geometry import axis_angle_rotation, matrix_to_axis_angle

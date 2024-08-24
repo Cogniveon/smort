@@ -1,11 +1,10 @@
 from typing import Dict
 
+import numpy as np
 import torch
 import torch.nn as nn
-from torch import Tensor
-import numpy as np
-
 from einops import repeat
+from torch import Tensor
 
 
 class PositionalEncoding(nn.Module):

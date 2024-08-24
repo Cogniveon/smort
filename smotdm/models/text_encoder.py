@@ -1,9 +1,10 @@
 import os
-import torch.nn as nn
-import torch
-from torch import Tensor
 from typing import Dict, List
+
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 
 class TextToEmb(nn.Module):
@@ -16,8 +17,7 @@ class TextToEmb(nn.Module):
         super().__init__()
 
         self.device = device
-        from transformers import AutoTokenizer, AutoModel
-        from transformers import logging
+        from transformers import AutoModel, AutoTokenizer, logging
 
         logging.set_verbosity_error()
 

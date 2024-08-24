@@ -1,8 +1,9 @@
 from typing import Dict, List, Literal, Optional
 
-from pytorch_lightning import LightningModule
 import torch
+from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
+
 from smotdm.data.collate import length_to_mask
 from smotdm.models.losses import KLLoss
 from smotdm.models.modules import ACTORStyleDecoder, ACTORStyleEncoder

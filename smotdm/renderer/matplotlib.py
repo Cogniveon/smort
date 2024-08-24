@@ -6,12 +6,14 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Tuple, Optional
-import numpy as np
-from smotdm.rifke import canonicalize_rotation
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from typing import Iterable, Optional, Tuple
+
 import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.animation import FuncAnimation
+
+from smotdm.rifke import canonicalize_rotation
 
 logger = logging.getLogger("matplotlib.animation")
 logger.setLevel(logging.ERROR)
