@@ -1,2 +1,5 @@
-# defaults:
-#   - _self_
+defaults:
+  - _self_
+
+_target_: smotdm.data.text_motion_dataset.TextMotionDataset
+path: deps/interx/processed/dataset.h5

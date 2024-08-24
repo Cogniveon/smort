@@ -1,2 +1,6 @@
-# defaults:
-#   - _self_
+defaults:
+  - _self_
+
+_target_: smotdm.models.smotdm.SMOTDM
+vae: true
+lr: 1e-4

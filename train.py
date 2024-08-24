@@ -1,4 +1,5 @@
 import logging
+import os
 
 import hydra
 from hydra.utils import instantiate
@@ -15,35 +16,29 @@ def train(cfg: DictConfig):
     logger.info(f"The config can be found here: {config_path}")
 
     import pytorch_lightning as pl
+    from torch.utils.data import DataLoader
 
     pl.seed_everything(cfg.seed)
 
-    logger.info("Loading the dataloaders")
+    logger.info("Loading dataloaders")
+    train_dataset = instantiate(cfg.data)
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=cfg.batch_size,
+        collate_fn=train_dataset.collate_fn,
+        shuffle=True,
+        num_workers=os.cpu_count() or 1,
+        persistent_workers=True,
+    )
 
-    # train_dataset = instantiate(cfg.data, split="train")
-    # val_dataset = instantiate(cfg.data, split="val")
+    logger.info("Loading model")
+    model = instantiate(cfg.model, dataset=train_dataset)
 
-    # train_dataloader = instantiate(
-    #     cfg.dataloader,
-    #     dataset=train_dataset,
-    #     collate_fn=train_dataset.collate_fn,
-    #     shuffle=True,
-    # )
-
-    # val_dataloader = instantiate(
-    #     cfg.dataloader,
-    #     dataset=val_dataset,
-    #     collate_fn=val_dataset.collate_fn,
-    #     shuffle=False,
-    # )
-
-    # logger.info("Loading the model")
-    # model = instantiate(cfg.model)
-
-    # logger.info("Training")
-    # trainer = instantiate(cfg.trainer)
-    # trainer.fit(model, train_dataloader, val_dataloader, ckpt_path=ckpt)
-
+    logger.info("Training")
+    trainer: pl.Trainer = instantiate(cfg.trainer)
+    trainer.fit(model, train_dataloader)
+    logger.info("Training done.")
+    
 
 if __name__ == "__main__":
     train()

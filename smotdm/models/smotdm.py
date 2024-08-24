@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
 import torch
@@ -7,63 +8,66 @@ from torch.optim.adamw import AdamW
 from smotdm.data.collate import length_to_mask
 from smotdm.models.losses import KLLoss
 from smotdm.models.modules import ACTORStyleDecoder, ACTORStyleEncoder
+from smotdm.models.text_encoder import TextToEmb
+from smotdm.renderer.matplotlib import SingleMotionRenderer
+from smotdm.rifke import feats_to_joints
 
 
 class SMOTDM(LightningModule):
     def __init__(
         self,
-        vae: bool,
+        dataset,
+        nmotionfeats: int = 166,
+        ntextfeats: int = 768,
+        latent_dim: int = 256,
+        ff_size: int = 1024,
+        num_layers: int = 6,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+        activation: str = "gelu",
+        vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
         lmd: Dict = {"recons": 1.0, "latent": 1.0e-5, "kl": 1.0e-5},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
-
-        self.motion_encoder = ACTORStyleEncoder(
-            nfeats=166,
-            vae=True,
-            latent_dim=256,
-            ff_size=1024,
-            num_layers=6,
-            num_heads=4,
-            dropout=0.1,
-            activation="gelu",
-        )
-        self.text_encoder = ACTORStyleEncoder(
-            nfeats=768,
-            vae=True,
-            latent_dim=256,
-            ff_size=1024,
-            num_layers=6,
-            num_heads=4,
-            dropout=0.1,
-            activation="gelu",
-        )
-        # self.actor_encoder = ACTORStyleEncoder(
-        #     nfeats=166,
-        #     vae=True,
-        #     latent_dim=256,
-        #     ff_size=1024,
-        #     num_layers=6,
-        #     num_heads=4,
-        #     dropout=0.1,
-        #     activation="gelu",
-        # )
-        self.motion_decoder = ACTORStyleDecoder(
-            nfeats=166,
-            latent_dim=256,
-            ff_size=1024,
-            num_layers=6,
-            num_heads=4,
-            dropout=0.1,
-            activation="gelu",
-        )
+        self.save_hyperparameters(ignore=['dataset'])
 
         # sampling parameters
         self.vae = vae
         self.fact = fact if fact is not None else 1.0
         self.sample_mean = sample_mean
+
+        self.motion_encoder = ACTORStyleEncoder(
+            nfeats=nmotionfeats,
+            vae=vae,
+            latent_dim=latent_dim,
+            ff_size=ff_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dropout=dropout,
+            activation=activation,
+        )
+        self.text_encoder = ACTORStyleEncoder(
+            nfeats=ntextfeats,
+            vae=vae,
+            latent_dim=latent_dim,
+            ff_size=ff_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dropout=dropout,
+            activation=activation,
+        )
+        self.motion_decoder = ACTORStyleDecoder(
+            nfeats=nmotionfeats,
+            latent_dim=latent_dim,
+            ff_size=ff_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dropout=dropout,
+            activation=activation,
+        )
 
         # losses
         self.reconstruction_loss_fn = torch.nn.SmoothL1Loss(reduction="mean")
@@ -73,9 +77,31 @@ class SMOTDM(LightningModule):
         # lambda weighting for the losses
         self.lmd = lmd
         self.lr = lr
+        
+        text_embeds = TextToEmb(
+            "distilbert/distilbert-base-uncased",
+        )(
+            [
+                "Two people walk towards each other. "
+                "After they meet, the first person hugs the second person around the "
+                "shoulders, gently patting his/her back with his/her right hand. "
+                "Meanwhile, the second person puts his/her arms around the first "
+                "person's waist and pats his/her waist with his/her right hand."
+            ]
+        )
+        self.dataset = dataset
+        self.viz_test_batch = {
+            "x": text_embeds["x"],
+            "mask": length_to_mask(text_embeds["length"]),
+        }
+        self.renderer = SingleMotionRenderer(
+            colors=("red", "red", "red", "red", "red"),
+        )
 
     def configure_optimizers(self):
-        return {"optimizer": AdamW(lr=self.lr, params=self.parameters())}
+        return {
+            "optimizer": AdamW(lr=self.lr, params=self.parameters()),
+        }
 
     def forward(
         self,
@@ -195,6 +221,28 @@ class SMOTDM(LightningModule):
                 prog_bar=loss_name == "loss",
             )
         return losses["loss"]
+
+    def on_train_epoch_end(self) -> None:
+        super().on_train_epoch_end()
+        self.viz_test_batch['x'] = self.viz_test_batch['x'].to(self.device)
+        self.viz_test_batch['mask'] = self.viz_test_batch['mask'].to(self.device)
+        encoded = self.text_encoder(self.viz_test_batch)
+
+        dists = encoded.unbind(1)
+        mu, logvar = dists
+        latent_vectors = mu
+        motion = self.dataset.reverse_norm(
+            self.motion_decoder(
+                {
+                    "z": latent_vectors,
+                    "mask": self.viz_test_batch['mask'],
+                }
+            ).squeeze(dim=0)
+        )
+        self.renderer.render_animation_single(
+            feats_to_joints(torch.from_numpy(motion)).detach().cpu().numpy(),
+            output=str(Path(self.loggers[0].save_dir) / 'test.mp4') # type: ignore
+        )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])

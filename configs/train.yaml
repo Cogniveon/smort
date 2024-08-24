@@ -1,11 +1,11 @@
 defaults:
   - data: interx
   - model: smotdm
-  - trainer
   - defaults
+  - trainer
   - _self_
 
 
 seed: 42
+batch_size: 1
 run_dir: outputs/${hydra:runtime.choices.model}_${hydra:runtime.choices.data}
-
