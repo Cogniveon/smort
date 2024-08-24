@@ -26,8 +26,8 @@ def train(cfg: DictConfig):
 
     logger.info("Loading model")
     mean, std = data_module.dataset.get_mean_std()
-    # model: SMOTDM = instantiate(cfg.model, data_mean=mean, data_std=std)
-    model = SMOTDM.load_from_checkpoint('local_model.ckpt', data_mean=mean, data_std=std)
+    model: SMOTDM = instantiate(cfg.model, data_mean=mean, data_std=std)
+    # model = SMOTDM.load_from_checkpoint('local_model.ckpt', data_mean=mean, data_std=std)
 
     logger.info("Training")
     trainer: pl.Trainer = instantiate(cfg.trainer)
