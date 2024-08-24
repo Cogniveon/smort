@@ -5,7 +5,7 @@ defaults:
 base_dir: deps/interx
 dataset_file: deps/interx/processed/dataset.h5
 motions_path: deps/interx/processed/motions_fps_20_0.csv
-device: cuda
+device: cpu
 
 text_encoder:
   _target_: smotdm.models.text_encoder.TextToEmb
@@ -16,8 +16,8 @@ text_encoder:
 fps: 20.0
 min_seconds: 2.0
 max_seconds: 30.0
-include_only: all
-# include_only: 100
+# include_only: all
+include_only: 100
 # include_only:
 #   - G001T000A001R005
 #   - G001T003A019R024

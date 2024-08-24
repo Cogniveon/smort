@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 from pathlib import Path
 
@@ -43,7 +44,7 @@ def compute_feats(cfg: DictConfig):
     )
     dataset = h5py.File(dataset_file, "w")
     motions_df = None
-    mean_std = MeanStdMetric(166).to(device)
+    mean_std = MeanStdMetric(166, math.floor(max_seconds * fps)).to(device)
 
     motions_dataset = dataset.create_group("motions")
     texts_dataset = dataset.create_group("texts")
@@ -93,8 +94,7 @@ def compute_feats(cfg: DictConfig):
             ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"
 
             # Update mean and standard deviation metrics
-            mean_std.update(scene_motions[0], reactor_feats.shape[0])
-            mean_std.update(scene_motions[1], actor_feats.shape[0])
+            mean_std.update(scene_motions, scene_motions.shape[1])
 
             motions_df = pd.concat(
                 [
