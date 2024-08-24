@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
+import numpy as np
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
@@ -16,7 +17,8 @@ from smotdm.rifke import feats_to_joints
 class SMOTDM(LightningModule):
     def __init__(
         self,
-        dataset,
+        data_mean: torch.Tensor,
+        data_std: torch.Tensor,
         nmotionfeats: int = 166,
         ntextfeats: int = 768,
         latent_dim: int = 256,
@@ -78,22 +80,8 @@ class SMOTDM(LightningModule):
         self.lmd = lmd
         self.lr = lr
 
-        text_embeds = TextToEmb(
-            "distilbert/distilbert-base-uncased",
-        )(
-            [
-                "Two people walk towards each other. "
-                "After they meet, the first person hugs the second person around the "
-                "shoulders, gently patting his/her back with his/her right hand. "
-                "Meanwhile, the second person puts his/her arms around the first "
-                "person's waist and pats his/her waist with his/her right hand."
-            ]
-        )
-        self.dataset = dataset
-        self.viz_test_batch = {
-            "x": text_embeds["x"],
-            "mask": length_to_mask(text_embeds["length"]),
-        }
+        self.data_mean = data_mean
+        self.data_std = data_std
         self.renderer = SingleMotionRenderer(
             colors=("red", "red", "red", "red", "red"),
         )
@@ -221,30 +209,29 @@ class SMOTDM(LightningModule):
                 prog_bar=loss_name == "loss",
             )
         return losses["loss"]
-
-    def on_train_epoch_end(self) -> None:
-        super().on_train_epoch_end()
-        self.viz_test_batch["x"] = self.viz_test_batch["x"].to(self.device)
-        self.viz_test_batch["mask"] = self.viz_test_batch["mask"].to(self.device)
-        encoded = self.text_encoder(self.viz_test_batch)
-
-        dists = encoded.unbind(1)
-        mu, logvar = dists
-        latent_vectors = mu
-        motion = self.dataset.reverse_norm(
-            self.motion_decoder(
-                {
-                    "z": latent_vectors,
-                    "mask": self.viz_test_batch["mask"],
-                }
-            ).squeeze(dim=0)
-        )
+    
+    def norm_and_render_motion(self, motion: torch.Tensor, output=None):
+        if output is None:
+            assert self.logger is not None
+            output = "viz.mp4"
+        
+        motion = motion * (self.data_std[:motion.shape[0], :] + 1e-12) + self.data_mean[:motion.shape[0], :]
+        
         self.renderer.render_animation_single(
-            feats_to_joints(torch.from_numpy(motion)).detach().cpu().numpy(),
-            output=str(Path(self.loggers[0].save_dir) / "test.mp4"),  # type: ignore
+            feats_to_joints(motion).detach().cpu().numpy(),
+            output=output
         )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
+        if batch_idx == 0:
+            viz_batch = batch['reactor_x_dict']
+            viz_batch['x'] = viz_batch['x'][:1, ...]
+            viz_batch['mask'] = viz_batch['mask'][:1, ...]
+            motions, latents, dists = self(
+                viz_batch, "reactor", mask=viz_batch["mask"], return_all=True
+            )
+            self.norm_and_render_motion(motions[0], 'viz.mp4')
+            
         bs = len(batch["reactor_x_dict"]["x"])
         losses = self.compute_loss(batch)
 

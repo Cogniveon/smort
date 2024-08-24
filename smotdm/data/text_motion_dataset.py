@@ -77,6 +77,15 @@ class TextMotionDataset(Dataset):
 
             return ret_dict
 
+    def get_mean_std(self, return_tensors: bool = True):
+        with h5py.File(self.dataset_path, "r") as f:
+            mean = f["stats/mean"][()]  # type: ignore
+            std = f["stats/std"][()]  # type: ignore
+            if return_tensors:
+                return torch.from_numpy(mean), torch.from_numpy(std)
+            return mean, std
+
+        
     def reverse_norm(self, motion: np.ndarray | torch.Tensor):
         if type(motion) is torch.Tensor:
             motion = motion.detach().cpu().numpy()

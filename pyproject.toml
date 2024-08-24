@@ -18,6 +18,8 @@ dependencies = [
     "pytorch_lightning",
     "torchmetrics",
     "torchvision",
+    "tensorboard",
+    "tensorboardX",
     "matplotlib",
     "plotly",
     "gdown",

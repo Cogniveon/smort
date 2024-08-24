@@ -15,16 +15,19 @@ def train(cfg: DictConfig):
     logger.info(f"The config can be found here: {config_path}")
 
     import pytorch_lightning as pl
-    from torch.utils.data import DataLoader
+    from smotdm.data.data_module import InterXDataModule
+    from smotdm.models.smotdm import SMOTDM
 
     pl.seed_everything(cfg.seed)
 
     logger.info("Loading datamodule")
-    data_module = instantiate(cfg.data)
+    data_module: InterXDataModule = instantiate(cfg.data)
     data_module.setup("train")
 
     logger.info("Loading model")
-    model = instantiate(cfg.model, dataset=data_module.dataset)
+    mean, std = data_module.dataset.get_mean_std()
+    # model: SMOTDM = instantiate(cfg.model, data_mean=mean, data_std=std)
+    model = SMOTDM.load_from_checkpoint('local_model.ckpt', data_mean=mean, data_std=std)
 
     logger.info("Training")
     trainer: pl.Trainer = instantiate(cfg.trainer)
