@@ -20,6 +20,8 @@ dependencies = [
     "torchvision",
     "matplotlib",
     "plotly",
+    "gdown",
+    "awscli",
     "scipy",
     "hydra-core",
     "hydra-colorlog",
