@@ -82,8 +82,8 @@ class TextMotionDataset(Dataset):
             mean = f["stats/mean"][()]  # type: ignore
             std = f["stats/std"][()]  # type: ignore
             if return_tensors:
-                return torch.from_numpy(mean), torch.from_numpy(std)
-            return mean, std
+                return torch.from_numpy(mean), torch.from_numpy(std) + self.eps
+            return mean, std + self.eps # type: ignore
 
         
     def reverse_norm(self, motion: np.ndarray | torch.Tensor):

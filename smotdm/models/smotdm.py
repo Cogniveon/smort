@@ -214,11 +214,11 @@ class SMOTDM(LightningModule):
         if output is None:
             assert self.logger is not None
             output = "viz.mp4"
-        if self.data_std.device != motion.device:
-            self.data_mean.to(motion.device)
-            self.data_std.to(motion.device)
+
+        self.data_mean = self.data_mean.to(motion.device)
+        self.data_std = self.data_std.to(motion.device)
         
-        motion = motion * (self.data_std[:motion.shape[0], :] + 1e-12) + self.data_mean[:motion.shape[0], :]
+        motion = motion * (self.data_std[:motion.shape[0], :]) + self.data_mean[:motion.shape[0], :]
         
         self.renderer.render_animation_single(
             feats_to_joints(motion).detach().cpu().numpy(),
