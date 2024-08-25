@@ -159,6 +159,7 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
     def __init__(
         self,
         nfeats: int,
+        n_context_feats: int,
         vae: bool,
         latent_dim: int = 256,
         ff_size: int = 1024,
@@ -176,6 +177,13 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
             num_heads,
             dropout,
             activation,
+        )
+        self.context_projection = nn.Linear(n_context_feats, latent_dim)
+        self.cross_attention = nn.MultiheadAttention(
+            embed_dim=latent_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
         )
 
     def forward(self, x_dict: Dict, context_dict: Dict) -> Tensor:
@@ -203,7 +211,7 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
         context_mask = context_dict["mask"]
 
         # Project context features to latent dimension
-        context = self.projection(context)
+        context = self.context_projection(context)
         context = self.sequence_pos_encoding(context)
 
         # Perform cross-attention

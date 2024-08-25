@@ -38,8 +38,9 @@ class SMORT(LightningModule):
         self.fact = fact if fact is not None else 1.0
         self.sample_mean = sample_mean
 
-        self.motion_encoder = ACTORStyleEncoder(
+        self.motion_encoder = ACTORStyleEncoderWithCA(
             nfeats=nmotionfeats,
+            n_context_feats=nmotionfeats,
             vae=vae,
             latent_dim=latent_dim,
             ff_size=ff_size,
@@ -50,6 +51,17 @@ class SMORT(LightningModule):
         )
         self.text_encoder = ACTORStyleEncoder(
             nfeats=ntextfeats,
+            vae=vae,
+            latent_dim=latent_dim,
+            ff_size=ff_size,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dropout=dropout,
+            activation=activation,
+        )
+        self.scene_encoder = ACTORStyleEncoderWithCA(
+            nfeats=nmotionfeats,
+            n_context_feats=ntextfeats,
             vae=vae,
             latent_dim=latent_dim,
             ff_size=ff_size,
@@ -90,8 +102,9 @@ class SMORT(LightningModule):
 
     def forward(
         self,
-        inputs,
-        input_type: Literal["reactor", "text"],
+        inputs: Dict,
+        input_type: Literal["reactor", "scene", "text"],
+        context: Optional[Dict] = None,
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
         sample_mean: Optional[bool] = None,
@@ -103,12 +116,16 @@ class SMORT(LightningModule):
 
         if input_type == "text":
             encoder = self.text_encoder
-        # elif input_type == "actor":
-        #     encoder = self.actor_encoder
+        elif input_type == "scene":
+            encoder = self.scene_encoder
         else:
             encoder = self.motion_encoder
 
-        encoded = encoder(inputs)
+        if isinstance(encoder, ACTORStyleEncoderWithCA):
+            assert context is not None
+            encoded = encoder(inputs, context)
+        else:
+            encoded = encoder(inputs)
 
         # Sampling
         if self.vae:
@@ -141,18 +158,19 @@ class SMORT(LightningModule):
 
         mask = reactor_x_dict["mask"]
         ref_motions = reactor_x_dict["x"]
-
+        
+        # encoder types: "reactor", "scene", "text"
         # text -> motion
         t_motions, t_latents, t_dists = self(
             text_x_dict, "text", mask=mask, return_all=True
         )
-        # # actor -> reactor motion
-        # a_motions, a_latents, a_dists = self(
-        #     actor_x_dict, "actor", mask=mask, return_all=True
-        # )
+        # scene -> motion
+        s_motions, s_latents, s_dists = self(
+            actor_x_dict, "scene", text_x_dict, mask=mask, return_all=True
+        )
         # motion -> motion
         m_motions, m_latents, m_dists = self(
-            reactor_x_dict, "reactor", mask=mask, return_all=True
+            reactor_x_dict, "reactor", actor_x_dict, mask=mask, return_all=True
         )
 
         # Store all losses
@@ -162,7 +180,8 @@ class SMORT(LightningModule):
         # fmt: off
         losses["recons"] = (
             + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
-            + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
+            + self.reconstruction_loss_fn(s_motions, ref_motions) # scene -> motion
+            + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
         )
         # fmt: on
 
@@ -177,13 +196,16 @@ class SMORT(LightningModule):
             losses["kl"] = (
                 self.kl_loss_fn(t_dists, m_dists)  # text_to_motion
                 + self.kl_loss_fn(m_dists, t_dists)  # motion_to_text
+                + self.kl_loss_fn(s_dists, t_dists)  # scene_to_text
+                + self.kl_loss_fn(t_dists, s_dists)  # text_to_scene
+                + self.kl_loss_fn(s_dists, ref_dists)  # scene
                 + self.kl_loss_fn(m_dists, ref_dists)  # motion
                 + self.kl_loss_fn(t_dists, ref_dists)  # text
             )
 
         # Latent manifold loss
         losses["latent_t"] = self.latent_loss_fn(t_latents, m_latents)
-        # losses["latent_a"] = self.latent_loss_fn(a_latents, m_latents)
+        losses["latent_s"] = self.latent_loss_fn(s_latents, m_latents)
 
         # Weighted average of the losses
         losses["loss"] = sum(
