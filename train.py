@@ -15,6 +15,7 @@ def train(cfg: DictConfig):
     logger.info(f"The config can be found here: {config_path}")
 
     import pytorch_lightning as pl
+
     from smort.data.data_module import InterXDataModule
     from smort.models.smort import SMORT
 

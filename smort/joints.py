@@ -108,6 +108,30 @@ JOINT_NAMES = {
     ],
 }
 
+SMPLX_JOINT_PAIRS = [
+    (0, 1),  # pelvis to left_hip
+    (0, 2),  # pelvis to right_hip
+    (0, 3),  # pelvis to spine1
+    (3, 6),  # spine1 to spine2
+    (6, 9),  # spine2 to spine3
+    (9, 12),  # spine3 to neck
+    (12, 15),  # neck to head
+    (1, 4),  # left_hip to left_knee
+    (2, 5),  # right_hip to right_knee
+    (4, 7),  # left_knee to left_ankle
+    (5, 8),  # right_knee to right_ankle
+    (7, 10),  # left_ankle to left_foot
+    (8, 11),  # right_ankle to right_foot
+    (12, 13),  # neck to left_collar
+    (12, 14),  # neck to right_collar
+    (13, 16),  # left_collar to left_shoulder
+    (14, 17),  # right_collar to right_shoulder
+    (16, 18),  # left_shoulder to left_elbow
+    (17, 19),  # right_shoulder to right_elbow
+    (18, 20),  # left_elbow to left_wrist
+    (19, 21),  # right_elbow to right_wrist
+]
+
 INFOS = {
     "smplxjoints": {
         "LM": JOINT_NAMES["smpljoints"].index("left_ankle"),

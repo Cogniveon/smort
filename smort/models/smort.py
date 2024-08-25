@@ -1,3 +1,4 @@
+import random
 from typing import Dict, List, Literal, Optional
 
 import torch
@@ -5,8 +6,9 @@ from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
 
 from smort.data.collate import length_to_mask
-from smort.models.losses import KLLoss
-from smort.models.modules import ACTORStyleDecoder, ACTORStyleEncoder, ACTORStyleEncoderWithCA
+from smort.models.losses import JointLoss, KLLoss
+from smort.models.modules import (ACTORStyleDecoder, ACTORStyleEncoder,
+                                  ACTORStyleEncoderWithCA)
 from smort.renderer.matplotlib import SingleMotionRenderer
 from smort.rifke import feats_to_joints
 
@@ -27,7 +29,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1.0, "latent": 1.0e-5, "kl": 1.0e-5},
+        lmd: Dict = {"recons": 1, "joints": 0.5, "latent": 1.0e-5, "kl": 1.0e-5},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
@@ -38,9 +40,9 @@ class SMORT(LightningModule):
         self.fact = fact if fact is not None else 1.0
         self.sample_mean = sample_mean
 
-        self.motion_encoder = ACTORStyleEncoderWithCA(
+        self.reactor_encoder = ACTORStyleEncoderWithCA(
             nfeats=nmotionfeats,
-            n_context_feats=nmotionfeats,
+            n_context_feats=ntextfeats,
             vae=vae,
             latent_dim=latent_dim,
             ff_size=ff_size,
@@ -59,7 +61,7 @@ class SMORT(LightningModule):
             dropout=dropout,
             activation=activation,
         )
-        self.scene_encoder = ACTORStyleEncoderWithCA(
+        self.actor_encoder = ACTORStyleEncoderWithCA(
             nfeats=nmotionfeats,
             n_context_feats=ntextfeats,
             vae=vae,
@@ -80,17 +82,19 @@ class SMORT(LightningModule):
             activation=activation,
         )
 
+        self.data_mean = data_mean
+        self.data_std = data_std
+
         # losses
         self.reconstruction_loss_fn = torch.nn.SmoothL1Loss(reduction="mean")
         self.latent_loss_fn = torch.nn.SmoothL1Loss(reduction="mean")
         self.kl_loss_fn = KLLoss()
+        self.joint_loss_fn = JointLoss(self.data_mean, self.data_std)
 
         # lambda weighting for the losses
         self.lmd = lmd
         self.lr = lr
 
-        self.data_mean = data_mean
-        self.data_std = data_std
         self.renderer = SingleMotionRenderer(
             colors=("red", "red", "red", "red", "red"),
         )
@@ -103,7 +107,7 @@ class SMORT(LightningModule):
     def forward(
         self,
         inputs: Dict,
-        input_type: Literal["reactor", "scene", "text"],
+        input_type: Literal["reactor", "actor", "text"],
         context: Optional[Dict] = None,
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
@@ -116,10 +120,10 @@ class SMORT(LightningModule):
 
         if input_type == "text":
             encoder = self.text_encoder
-        elif input_type == "scene":
-            encoder = self.scene_encoder
+        elif input_type == "actor":
+            encoder = self.actor_encoder
         else:
-            encoder = self.motion_encoder
+            encoder = self.reactor_encoder
 
         if isinstance(encoder, ACTORStyleEncoderWithCA):
             assert context is not None
@@ -158,19 +162,19 @@ class SMORT(LightningModule):
 
         mask = reactor_x_dict["mask"]
         ref_motions = reactor_x_dict["x"]
-        
+
         # encoder types: "reactor", "scene", "text"
         # text -> motion
         t_motions, t_latents, t_dists = self(
             text_x_dict, "text", mask=mask, return_all=True
         )
-        # scene -> motion
-        s_motions, s_latents, s_dists = self(
-            actor_x_dict, "scene", text_x_dict, mask=mask, return_all=True
+        # actor -> motion
+        a_motions, a_latents, a_dists = self(
+            actor_x_dict, "actor", text_x_dict, mask=mask, return_all=True
         )
         # motion -> motion
         m_motions, m_latents, m_dists = self(
-            reactor_x_dict, "reactor", actor_x_dict, mask=mask, return_all=True
+            reactor_x_dict, "reactor", text_x_dict, mask=mask, return_all=True
         )
 
         # Store all losses
@@ -180,10 +184,12 @@ class SMORT(LightningModule):
         # fmt: off
         losses["recons"] = (
             + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
-            + self.reconstruction_loss_fn(s_motions, ref_motions) # scene -> motion
-            + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
+            + self.reconstruction_loss_fn(a_motions, ref_motions) # actor -> motion
+            + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
         )
         # fmt: on
+
+        losses["joints"] = self.joint_loss_fn(m_motions, ref_motions)
 
         # VAE losses
         if self.vae:
@@ -194,26 +200,26 @@ class SMORT(LightningModule):
             ref_dists = (ref_mus, ref_logvar)
 
             losses["kl"] = (
-                self.kl_loss_fn(t_dists, m_dists)  # text_to_motion
-                + self.kl_loss_fn(m_dists, t_dists)  # motion_to_text
-                + self.kl_loss_fn(s_dists, t_dists)  # scene_to_text
-                + self.kl_loss_fn(t_dists, s_dists)  # text_to_scene
-                + self.kl_loss_fn(s_dists, ref_dists)  # scene
-                + self.kl_loss_fn(m_dists, ref_dists)  # motion
+                self.kl_loss_fn(t_dists, m_dists)  # text_to_reactor
+                + self.kl_loss_fn(m_dists, t_dists)  # reactor_to_text
+                + self.kl_loss_fn(a_dists, t_dists)  # actor_to_text
+                + self.kl_loss_fn(t_dists, a_dists)  # text_to_actor
+                + self.kl_loss_fn(a_dists, ref_dists)  # actor
+                + self.kl_loss_fn(m_dists, ref_dists)  # reactor
                 + self.kl_loss_fn(t_dists, ref_dists)  # text
             )
 
         # Latent manifold loss
         losses["latent_t"] = self.latent_loss_fn(t_latents, m_latents)
-        losses["latent_s"] = self.latent_loss_fn(s_latents, m_latents)
+        losses["latent_a"] = self.latent_loss_fn(a_latents, m_latents)
 
         # Weighted average of the losses
         losses["loss"] = sum(
             self.lmd[x] * val for x, val in losses.items() if x in self.lmd
         )
-        
+
         if return_motions:
-            return losses, m_motions, ref_motions # type: ignore
+            return losses, m_motions, ref_motions  # type: ignore
         return losses
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
@@ -231,7 +237,7 @@ class SMORT(LightningModule):
                 prog_bar=loss_name == "loss",
             )
         return losses["loss"]
-    
+
     def norm_and_render_motion(self, motion: torch.Tensor, output=None):
         if output is None:
             assert self.logger is not None
@@ -239,22 +245,24 @@ class SMORT(LightningModule):
 
         self.data_mean = self.data_mean.to(motion.device)
         self.data_std = self.data_std.to(motion.device)
-        
-        motion = motion * (self.data_std[:motion.shape[0], :]) + self.data_mean[:motion.shape[0], :]
-        
+
+        motion = (
+            motion * (self.data_std[: motion.shape[0], :])
+            + self.data_mean[: motion.shape[0], :]
+        )
+
         self.renderer.render_animation_single(
-            feats_to_joints(motion).detach().cpu().numpy(),
-            output=output
+            feats_to_joints(motion).detach().cpu().numpy(), output=output
         )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
         losses, motions, orig_motions = self.compute_loss(batch, return_motions=True)
-        
+
         if batch_idx == 0:
-            self.norm_and_render_motion(motions[0], 'viz.mp4')
-            self.norm_and_render_motion(orig_motions[0], 'gt.mp4')
-            
+            random_idx = random.randint(0, bs)
+            self.norm_and_render_motion(motions[random_idx], "viz.mp4")
+            self.norm_and_render_motion(orig_motions[random_idx], "gt.mp4")
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]

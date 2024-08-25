@@ -154,7 +154,6 @@ class ACTORStyleDecoder(nn.Module):
         return output
 
 
-
 class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
     def __init__(
         self,
@@ -205,7 +204,7 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
 
         # Add positional encoding
         xseq = self.sequence_pos_encoding(xseq)
-        
+
         # Cross-attention with context
         context = context_dict["x"]
         context_mask = context_dict["mask"]
@@ -216,13 +215,10 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
 
         # Perform cross-attention
         attn_output, _ = self.cross_attention(
-            query=xseq,
-            key=context,
-            value=context,
-            key_padding_mask=~context_mask
+            query=xseq, key=context, value=context, key_padding_mask=~context_mask
         )
 
         # Pass through transformer encoder
         final = self.seqTransEncoder(attn_output, src_key_padding_mask=~aug_mask)
-        
+
         return final[:, : self.nbtokens]
