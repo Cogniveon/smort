@@ -4,15 +4,14 @@ import torch
 from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
 
-from smotdm.data.collate import length_to_mask
-from smotdm.models.losses import KLLoss
-from smotdm.models.modules import ACTORStyleDecoder, ACTORStyleEncoder
-from smotdm.models.text_encoder import TextToEmb
-from smotdm.renderer.matplotlib import SingleMotionRenderer
-from smotdm.rifke import feats_to_joints
+from smort.data.collate import length_to_mask
+from smort.models.losses import KLLoss
+from smort.models.modules import ACTORStyleDecoder, ACTORStyleEncoder, ACTORStyleEncoderWithCA
+from smort.renderer.matplotlib import SingleMotionRenderer
+from smort.rifke import feats_to_joints
 
 
-class SMOTDM(LightningModule):
+class SMORT(LightningModule):
     def __init__(
         self,
         data_mean: torch.Tensor,

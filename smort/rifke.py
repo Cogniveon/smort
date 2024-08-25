@@ -5,8 +5,8 @@ import torch
 from einops import rearrange
 from torch import Tensor
 
-from smotdm.geometry import axis_angle_rotation, matrix_to_axis_angle
-from smotdm.joints import INFOS
+from smort.geometry import axis_angle_rotation, matrix_to_axis_angle
+from smort.joints import INFOS
 
 
 def feats_to_joints(features: Tensor) -> Tensor:

@@ -152,3 +152,69 @@ class ACTORStyleDecoder(nn.Module):
         # zero for padded area
         output[~mask] = 0
         return output
+
+
+
+class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
+    def __init__(
+        self,
+        nfeats: int,
+        vae: bool,
+        latent_dim: int = 256,
+        ff_size: int = 1024,
+        num_layers: int = 4,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+        activation: str = "gelu",
+    ) -> None:
+        super().__init__(
+            nfeats,
+            vae,
+            latent_dim,
+            ff_size,
+            num_layers,
+            num_heads,
+            dropout,
+            activation,
+        )
+
+    def forward(self, x_dict: Dict, context_dict: Dict) -> Tensor:
+        x = x_dict["x"]
+        mask = x_dict["mask"]
+
+        # Project input features to the latent dimension
+        x = self.projection(x)
+
+        device = x.device
+        bs = len(x)
+
+        # Create tokens for VAE
+        tokens = repeat(self.tokens, "nbtoken dim -> bs nbtoken dim", bs=bs)
+        xseq = torch.cat((tokens, x), 1)
+
+        token_mask = torch.ones((bs, self.nbtokens), dtype=bool, device=device)  # type: ignore
+        aug_mask = torch.cat((token_mask, mask), 1)
+
+        # Add positional encoding
+        xseq = self.sequence_pos_encoding(xseq)
+        
+        # Cross-attention with context
+        context = context_dict["x"]
+        context_mask = context_dict["mask"]
+
+        # Project context features to latent dimension
+        context = self.projection(context)
+        context = self.sequence_pos_encoding(context)
+
+        # Perform cross-attention
+        attn_output, _ = self.cross_attention(
+            query=xseq,
+            key=context,
+            value=context,
+            key_padding_mask=~context_mask
+        )
+
+        # Pass through transformer encoder
+        final = self.seqTransEncoder(attn_output, src_key_padding_mask=~aug_mask)
+        
+        return final[:, : self.nbtokens]

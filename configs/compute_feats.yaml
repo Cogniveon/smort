@@ -8,7 +8,7 @@ motions_path: deps/interx/processed/motions_fps_20_0.csv
 device: cpu
 
 text_encoder:
-  _target_: smotdm.models.text_encoder.TextToEmb
+  _target_: smort.models.text_encoder.TextToEmb
   modelpath: distilbert/distilbert-base-uncased
   mean_pooling: false
   device: ${device}

@@ -4,7 +4,7 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from smotdm.config import save_config
+from smort.config import save_config
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +15,8 @@ def train(cfg: DictConfig):
     logger.info(f"The config can be found here: {config_path}")
 
     import pytorch_lightning as pl
-    from smotdm.data.data_module import InterXDataModule
-    from smotdm.models.smotdm import SMOTDM
+    from smort.data.data_module import InterXDataModule
+    from smort.models.smort import SMORT
 
     pl.seed_everything(cfg.seed)
 
@@ -26,8 +26,8 @@ def train(cfg: DictConfig):
 
     logger.info("Loading model")
     mean, std = data_module.dataset.get_mean_std()
-    model: SMOTDM = instantiate(cfg.model, data_mean=mean, data_std=std)
-    # model = SMOTDM.load_from_checkpoint('local_model.ckpt', data_mean=mean, data_std=std)
+    model: SMORT = instantiate(cfg.model, data_mean=mean, data_std=std)
+    # model = SMORT.load_from_checkpoint('local_model.ckpt', data_mean=mean, data_std=std)
 
     logger.info("Training")
     trainer: pl.Trainer = instantiate(cfg.trainer)

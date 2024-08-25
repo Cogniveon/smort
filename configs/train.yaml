@@ -1,6 +1,6 @@
 defaults:
   - data: interx
-  - model: smotdm
+  - model: smort
   - defaults
   - trainer
   - _self_

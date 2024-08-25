@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from smotdm.data.collate import collate_text_motion
+from smort.data.collate import collate_text_motion
 
 
 class TextMotionDataset(Dataset):
@@ -77,13 +77,14 @@ class TextMotionDataset(Dataset):
 
             return ret_dict
 
-    def get_mean_std(self, return_tensors: bool = True):
+    def get_mean_std(self, return_tensors: bool = True) -> tuple[torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray]:
         with h5py.File(self.dataset_path, "r") as f:
             mean = f["stats/mean"][()]  # type: ignore
             std = f["stats/std"][()]  # type: ignore
             if return_tensors:
                 return torch.from_numpy(mean), torch.from_numpy(std) + self.eps
-            return mean, std + self.eps # type: ignore
+            assert type(mean) == np.ndarray and type(std) == np.ndarray
+            return mean, std + self.eps
 
         
     def reverse_norm(self, motion: np.ndarray | torch.Tensor):

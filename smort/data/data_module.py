@@ -6,7 +6,7 @@ import boto3
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, random_split
 
-from smotdm.data.text_motion_dataset import TextMotionDataset
+from smort.data.text_motion_dataset import TextMotionDataset
 
 
 class InterXDataModule(pl.LightningDataModule):

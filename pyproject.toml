@@ -3,7 +3,7 @@ requires = ["setuptools>=64", "setuptools_scm>=8", "wheel", "build"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smotdm"
+name = "smort"
 authors = [{ name = "Rohit Krishnan", email = "rohit.k.kesavan@gmail.com" }]
 requires-python = ">=3.9"
 dynamic = ["version"]
@@ -44,10 +44,10 @@ dependencies = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["smotdm*"]
+include = ["smort*"]
 
 [tool.setuptools_scm]
-version_file = "smotdm/__version__.py"
+version_file = "smort/__version__.py"
 
 # [project.optional-dependencies]
 # docs = [
@@ -65,8 +65,8 @@ version_file = "smotdm/__version__.py"
 #   "mypy==1.9.0"
 # ]
 # dev = [
-#   "smotdm[tests]",
-#   "smotdm[docs]",
+#   "smort[tests]",
+#   "smort[docs]",
 #   "jupyterlab",
 #   "ipykernel",
 #   "ipywidgets"
@@ -77,10 +77,10 @@ version_file = "smotdm/__version__.py"
 # [project.gui-scripts]
 # gui-script = "pkg:function"
 # [project.scripts]
-# process-amass = "smotdm_data.process_amass:main"
-# run-ui = "smotdm_ui.__main__:main"
-# train = "smotdm_trainer.__main__:train"
-# inference-server = "smotdm_inference.__main__:main"
+# process-amass = "smort_data.process_amass:main"
+# run-ui = "smort_ui.__main__:main"
+# train = "smort_trainer.__main__:train"
+# inference-server = "smort_inference.__main__:main"
 
 [tool.black]
 line-length = 88

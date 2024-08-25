@@ -1,6 +1,6 @@
 defaults:
   - _self_
 
-_target_: smotdm.models.smotdm.SMOTDM
+_target_: smort.models.smort.SMORT
 vae: true
 lr: 1e-4

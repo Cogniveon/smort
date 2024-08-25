@@ -19,7 +19,7 @@ formatters:
 
 handlers:
   console:
-    class: smotdm.tqdm_logging.TqdmLoggingHandler
+    class: smort.tqdm_logging.TqdmLoggingHandler
     formatter: colorlog
   file_out:
     class: logging.FileHandler

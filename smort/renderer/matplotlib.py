@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
 
-from smotdm.rifke import canonicalize_rotation
+from smort.rifke import canonicalize_rotation
 
 logger = logging.getLogger("matplotlib.animation")
 logger.setLevel(logging.ERROR)

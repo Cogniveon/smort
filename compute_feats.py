@@ -10,9 +10,9 @@ import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from smotdm.metrics import MeanStdMetric
-from smotdm.rifke import get_forward_direction, joints_to_feats
-from smotdm.utils import compute_joints, get_smplx_model, loop_interx
+from smort.metrics import MeanStdMetric
+from smort.rifke import get_forward_direction, joints_to_feats
+from smort.utils import compute_joints, get_smplx_model, loop_interx
 
 logger = logging.getLogger(__name__)
 
