@@ -155,7 +155,7 @@ class SMORT(LightningModule):
 
         return motions
 
-    def compute_loss(self, batch: Dict, return_motions: bool = False) -> Dict:
+    def compute_loss(self, batch: Dict, return_motions: bool = False, return_joints: bool = False, return_metrics: bool = False) -> tuple:
         text_x_dict = batch["text_x_dict"]
         actor_x_dict = batch["actor_x_dict"]
         reactor_x_dict = batch["reactor_x_dict"]
@@ -189,8 +189,11 @@ class SMORT(LightningModule):
         )
         # fmt: on
 
-        losses["joints"] = self.joint_loss_fn(m_motions, ref_motions)
-
+        if return_joints or return_metrics:
+            losses["joints"], m_joints, ref_joints = self.joint_loss_fn(m_motions, ref_motions, return_joints=True)
+        else:
+            losses["joints"] = self.joint_loss_fn(m_motions, ref_motions)
+        
         # VAE losses
         if self.vae:
             # Create a centred normal distribution to compare with
@@ -218,13 +221,19 @@ class SMORT(LightningModule):
             self.lmd[x] * val for x, val in losses.items() if x in self.lmd
         )
 
+        ret = (losses,)
         if return_motions:
-            return losses, m_motions, ref_motions  # type: ignore
-        return losses
+            ret = (*ret, m_motions, ref_motions,)
+        if return_joints:
+            ret = (*ret, m_joints, ref_joints,)
+        if return_metrics:
+            metrics = self.joint_loss_fn.evaluate_metrics(m_joints, ref_joints)
+            ret = (*ret, metrics)
+        return ret
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        losses = self.compute_loss(batch)
+        losses, = self.compute_loss(batch)
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
@@ -238,36 +247,41 @@ class SMORT(LightningModule):
             )
         return losses["loss"]
 
-    def norm_and_render_motion(self, motion: torch.Tensor, output=None):
+    def render_motion(self, motion: torch.Tensor, output=None):
         if output is None:
             assert self.logger is not None
             output = "viz.mp4"
 
-        self.data_mean = self.data_mean.to(motion.device)
-        self.data_std = self.data_std.to(motion.device)
-
-        motion = (
-            motion * (self.data_std[: motion.shape[0], :])
-            + self.data_mean[: motion.shape[0], :]
-        )
-
         self.renderer.render_animation_single(
-            feats_to_joints(motion).detach().cpu().numpy(), output=output
+            motion.detach().cpu().numpy(), output=output
         )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        losses, motions, orig_motions = self.compute_loss(batch, return_motions=True)
+        losses, joints, gt_joints, metrics = self.compute_loss(batch, return_joints=True, return_metrics=True)
 
         if batch_idx == 0:
-            random_idx = random.randint(0, bs)
-            self.norm_and_render_motion(motions[random_idx], "viz.mp4")
-            self.norm_and_render_motion(orig_motions[random_idx], "gt.mp4")
+            random_idx = random.randint(0, bs - 1)
+            # import pdb; pdb.set_trace()
+            self.render_motion(joints[random_idx], "viz.mp4")
+            self.render_motion(gt_joints[random_idx], "gt.mp4")
 
-        for loss_name in sorted(losses):
-            loss_val = losses[loss_name]
+
+        for metric_name in sorted(metrics):
+            loss_val = metrics[metric_name]
             self.log(
-                f"val_{loss_name}",
+                f"val_{metric_name}",
+                loss_val,
+                on_epoch=True,
+                on_step=True,
+                batch_size=bs,
+                prog_bar=True,
+            )
+            
+        for metric_name in sorted(losses):
+            loss_val = losses[metric_name]
+            self.log(
+                f"val_{metric_name}",
                 loss_val,
                 on_epoch=True,
                 on_step=True,
