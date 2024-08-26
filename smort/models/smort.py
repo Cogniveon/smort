@@ -51,7 +51,7 @@ class SMORT(LightningModule):
             dropout=dropout,
             activation=activation,
         )
-        self.actor_encoder = ACTORStyleEncoderWithCA(
+        self.text_encoder = ACTORStyleEncoderWithCA(
             nfeats=ntextfeats,
             n_context_feats=nmotionfeats,
             vae=vae,
@@ -97,7 +97,7 @@ class SMORT(LightningModule):
     def forward(
         self,
         inputs: Dict,
-        input_type: Literal["reactor", "actor"],
+        input_type: Literal["reactor", "text"],
         context: Optional[Dict] = None,
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
