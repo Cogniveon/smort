@@ -1,3 +1,4 @@
+import math
 import random
 
 import h5py
@@ -16,11 +17,13 @@ class TextMotionDataset(Dataset):
         normalize: bool = True,
         eps: float = 1e-12,
         device: torch.device = torch.device("cpu"),
+        use_tiny: bool = False,
     ):
         self.collate_fn = collate_text_motion
         self.dataset_path = path
         self.motion_only = motion_only
         self.normalize = normalize
+        self.use_tiny = use_tiny
         self.eps = eps
         self.device = device
 
@@ -28,7 +31,11 @@ class TextMotionDataset(Dataset):
         with h5py.File(self.dataset_path, "r") as f:
             motions_dataset = f["motions"]
             assert type(motions_dataset) is h5py.Group
-            return len(list(motions_dataset.keys()))
+            num_scenes = len(list(motions_dataset.keys()))
+            if self.use_tiny:
+                return math.floor(num_scenes * 0.4)
+            else:
+                return num_scenes
 
     def __getitem__(self, index):
         with h5py.File(self.dataset_path, "r") as f:
@@ -41,6 +48,8 @@ class TextMotionDataset(Dataset):
 
             reactor_motion = scene_dataset[0]
             actor_motion = scene_dataset[1]
+            reactor_len = len(reactor_motion)
+            actor_len = len(actor_motion)
 
             if self.normalize:
                 mean = f["stats/mean"][()][: reactor_motion.shape[0], :]  # type: ignore
@@ -57,13 +66,13 @@ class TextMotionDataset(Dataset):
                 "x": torch.tensor(
                     reactor_motion, dtype=torch.float32, device=self.device
                 ),
-                "length": len(reactor_motion),
+                "length": reactor_len,
             }
             ret_dict["actor_x_dict"] = {
                 "x": torch.tensor(
                     actor_motion, dtype=torch.float32, device=self.device
                 ),
-                "length": len(actor_motion),
+                "length": actor_len,
             }
 
             if not self.motion_only:

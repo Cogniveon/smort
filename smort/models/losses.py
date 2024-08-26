@@ -46,7 +46,10 @@ class JointLoss(nn.Module):
         self.lmb = lmb
 
     def _denorm_and_to_joints(self, motion: torch.Tensor) -> torch.Tensor:
-        return feats_to_joints(motion * self.data_std[: motion.shape[-2], :] + self.data_mean[: motion.shape[-2], :],)
+        return feats_to_joints(
+            motion * self.data_std[: motion.shape[-2], :]
+            + self.data_mean[: motion.shape[-2], :],
+        )
 
     @staticmethod
     def compute_bone_lengths(joints: torch.Tensor) -> torch.Tensor:
@@ -72,30 +75,45 @@ class JointLoss(nn.Module):
 
         return sliding_loss
 
-    def compute_mpjme(self, predicted_joints: torch.Tensor, gt_joints: torch.Tensor) -> torch.Tensor:
+    def compute_mpjme(
+        self,
+        predicted_joints: torch.Tensor,
+        gt_joints: torch.Tensor,
+    ) -> torch.Tensor:
         # import pdb; pdb.set_trace()
         with torch.no_grad():
-            movement_error = torch.norm(predicted_joints[:, 1:, :, :] - predicted_joints[:, :-1, :, :] - gt_joints[:, 1:, :, :] - gt_joints[:, :-1, :, :], dim=-1,)
+            movement_error = torch.norm(
+                (predicted_joints[:, 1:, :, :] - predicted_joints[:, :-1, :, :])
+                - (gt_joints[:, 1:, :, :] - gt_joints[:, :-1, :, :]),
+                dim=-1,
+            )
             mpjme = movement_error.mean()
         return mpjme
 
-    def compute_mrpe(self, predicted_joints: torch.Tensor, gt_joints: torch.Tensor) -> torch.Tensor:
+    def compute_mrpe(
+        self, predicted_joints: torch.Tensor, gt_joints: torch.Tensor
+    ) -> torch.Tensor:
         with torch.no_grad():
-            position_error = torch.norm(predicted_joints[:, :, 0, :] - gt_joints[:, :, 0, :], dim=-1)
+            position_error = torch.norm(
+                predicted_joints[:, :, 0, :] - gt_joints[:, :, 0, :], dim=-1
+            )
             mrpe = position_error.mean()
         return mrpe
-    
+
     def evaluate_metrics(
         self, predicted_joints: torch.Tensor, gt_joints: torch.Tensor
     ) -> dict:
         """Compute evaluation metrics like MPJME."""
         metrics = {}
-        metrics['mpjme'] = self.compute_mpjme(predicted_joints, gt_joints)
-        metrics['mrpe'] = self.compute_mrpe(predicted_joints, gt_joints)
+        metrics["mpjme"] = self.compute_mpjme(predicted_joints, gt_joints)
+        metrics["mrpe"] = self.compute_mrpe(predicted_joints, gt_joints)
         return metrics
 
     def forward(
-        self, predicted_motion: torch.Tensor, gt_motion: torch.Tensor, return_joints: bool = False
+        self,
+        predicted_motion: torch.Tensor,
+        gt_motion: torch.Tensor,
+        return_joints: bool = False,
     ) -> torch.Tensor:
         # Denormalize and convert to joints
         predicted_joints = self._denorm_and_to_joints(predicted_motion)
@@ -103,10 +121,16 @@ class JointLoss(nn.Module):
 
         # Initialize loss
         loss = torch.tensor(0.0, dtype=torch.float32, device=predicted_motion.device)
+        # import pdb; pdb.set_trace()
 
         # Joint Position Loss
         if self.use_joint_position_loss:
-            joint_position_loss = F.mse_loss(predicted_joints, gt_joints)
+            # Just these joints
+            joint_selection = [0, 4, 5, 15, 11, 10, 12, 16, 17, 20, 21]
+            joint_position_loss = F.mse_loss(
+                predicted_joints[:, :, joint_selection, :],
+                gt_joints[:, :, joint_selection, :],
+            )
             loss += self.lmb["joint_position"] * joint_position_loss
 
         # Bone Length Loss
@@ -121,8 +145,9 @@ class JointLoss(nn.Module):
             foot_sliding_loss = self.compute_foot_sliding_loss(predicted_joints)
             loss += self.lmb["foot_sliding"] * foot_sliding_loss
 
+        # import pdb; pdb.set_trace()
         if return_joints:
-            return loss, predicted_joints, gt_joints # type: ignore
+            return loss, predicted_joints, gt_joints  # type: ignore
 
         return loss
 

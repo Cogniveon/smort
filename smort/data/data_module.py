@@ -11,12 +11,17 @@ from smort.data.text_motion_dataset import TextMotionDataset
 
 class InterXDataModule(pl.LightningDataModule):
     def __init__(
-        self, dataset_file: str, batch_size=32, num_workers=os.cpu_count()
+        self,
+        dataset_file: str,
+        batch_size=32,
+        num_workers=os.cpu_count(),
+        use_tiny: bool = False,
     ) -> None:
         super().__init__()
         self.dataset_file = dataset_file
         self.batch_size = batch_size
         self.num_workers = num_workers or 1
+        self.use_tiny = use_tiny
 
     def prepare_data(self):
         if not os.path.exists(self.dataset_file):
@@ -27,7 +32,7 @@ class InterXDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         self.prepare_data()
-        self.dataset = TextMotionDataset(self.dataset_file)
+        self.dataset = TextMotionDataset(self.dataset_file, use_tiny=self.use_tiny)
 
         total_scenes = len(self.dataset)
         train_len = math.floor(total_scenes * 0.8)
