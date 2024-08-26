@@ -125,12 +125,7 @@ class JointLoss(nn.Module):
 
         # Joint Position Loss
         if self.use_joint_position_loss:
-            # Just these joints
-            joint_selection = [0, 4, 5, 15, 11, 10, 12, 16, 17, 20, 21]
-            joint_position_loss = F.mse_loss(
-                predicted_joints[:, :, joint_selection, :],
-                gt_joints[:, :, joint_selection, :],
-            )
+            joint_position_loss = F.mse_loss(predicted_joints, gt_joints)
             loss += self.lmb["joint_position"] * joint_position_loss
 
         # Bone Length Loss
