@@ -32,7 +32,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joints": 1.0e-5, "latent": 1.0e-5, "kl": 1.0e-5},
+        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-5},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
@@ -150,10 +150,7 @@ class SMORT(LightningModule):
     def compute_loss(
         self,
         batch: Dict,
-        return_motions: bool = False,
-        return_joints: bool = False,
-        return_metrics: bool = False,
-    ) -> tuple:
+    ) -> dict:
         text_x_dict = batch["text_x_dict"]
         actor_x_dict = batch["actor_x_dict"]
         reactor_x_dict = batch["reactor_x_dict"]
@@ -185,17 +182,8 @@ class SMORT(LightningModule):
             + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
         )
         # fmt: on
-
-        if return_joints or return_metrics:
-            losses["joints"], m_joints, ref_joints = self.joint_loss_fn.forward(
-                m_motions, ref_motions, mask=mask, return_joints=True
-            )
-        else:
-            losses["joints"] = self.joint_loss_fn.forward(
-                m_motions,
-                ref_motions,
-                mask=mask,
-            )
+        
+        losses["joint"] = self.joint_loss_fn(m_motions, ref_motions, mask)
 
         # VAE losses
         if self.vae:
@@ -220,32 +208,16 @@ class SMORT(LightningModule):
             self.lmd[x] * val for x, val in losses.items() if x in self.lmd
         )
 
-        ret = (losses,)
-        if return_motions:
-            ret = (
-                *ret,
-                m_motions,
-                ref_motions,
-            )
-        if return_joints:
-            ret = (
-                *ret,
-                m_joints,
-                ref_joints,
-            )
-        if return_metrics:
-            metrics = self.joint_loss_fn.evaluate_metrics(m_joints, ref_joints)
-            ret = (*ret, metrics)
-        return ret
+        return losses
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        (losses, joints, gt_joints) = self.compute_loss(batch, return_joints=True)
+        losses = self.compute_loss(batch)
         
-        if batch_idx == 0:
-            random_idx = random.randint(0, bs - 1)
-            # import pdb; pdb.set_trace()
-            self.render_motion(joints[random_idx], gt_joints[random_idx], "local_train_viz.mp4")
+        # if batch_idx == 0:
+        #     random_idx = random.randint(0, bs - 1)
+        #     # import pdb; pdb.set_trace()
+        #     self.render_motion(joints[random_idx], gt_joints[random_idx], "local_train_viz.mp4")
 
 
         for loss_name in sorted(losses):
@@ -256,7 +228,7 @@ class SMORT(LightningModule):
                 on_epoch=True,
                 on_step=True,
                 batch_size=bs,
-                prog_bar=loss_name == "loss" or loss_name == "joints",
+                prog_bar=loss_name == "loss" or loss_name == "joint",
             )
         return losses["loss"]
 
@@ -273,32 +245,31 @@ class SMORT(LightningModule):
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        losses, joints, gt_joints, metrics = self.compute_loss(
-            batch, return_joints=True, return_metrics=True
+        losses = self.compute_loss(
+            batch
         )
+        # if batch_idx == 0:
+        #     random_idx = random.randint(0, bs - 1)
+        #     # import pdb; pdb.set_trace()
+        #     self.render_motion(joints[random_idx], gt_joints[random_idx], "local_val_viz.mp4")
 
-        if batch_idx == 0:
-            random_idx = random.randint(0, bs - 1)
-            # import pdb; pdb.set_trace()
-            self.render_motion(joints[random_idx], gt_joints[random_idx], "local_val_viz.mp4")
+        # for metric_name in sorted(metrics):
+        #     loss_val = metrics[metric_name]
+        #     self.log(
+        #         f"val_{metric_name}",
+        #         loss_val,
+        #         on_epoch=True,
+        #         on_step=True,
+        #         batch_size=bs,
+        #     )
 
-        for metric_name in sorted(metrics):
-            loss_val = metrics[metric_name]
-            self.log(
-                f"val_{metric_name}",
-                loss_val,
-                on_epoch=True,
-                on_step=True,
-                batch_size=bs,
-            )
-
-        for metric_name in sorted(losses):
-            loss_val = losses[metric_name]
-            self.log(
-                f"val_{metric_name}",
-                loss_val,
-                on_epoch=True,
-                on_step=True,
-                batch_size=bs,
-            )
+        # for metric_name in sorted(losses):
+        #     loss_val = losses[metric_name]
+        #     self.log(
+        #         f"val_{metric_name}",
+        #         loss_val,
+        #         on_epoch=True,
+        #         on_step=True,
+        #         batch_size=bs,
+        #     )
         return losses["loss"]

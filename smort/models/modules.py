@@ -178,6 +178,7 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
             dropout,
             activation,
         )
+        self.context_linear = nn.Linear(n_context_feats, n_context_feats)
         self.context_projection = nn.Linear(n_context_feats, latent_dim)
         self.cross_attention = nn.MultiheadAttention(
             embed_dim=latent_dim,
@@ -211,7 +212,7 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
         context_mask = context_dict["mask"]
 
         # Project context features to latent dimension
-        context = self.context_projection(context)
+        context = self.context_projection(self.context_linear(context))
         context = self.sequence_pos_encoding(context)
 
         # Perform cross-attention

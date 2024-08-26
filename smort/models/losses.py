@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from smort.joints import SMPLX_JOINT_PAIRS
-from smort.rifke import feats_to_joints
+from smort.rifke import feats_to_joints, ungroup
 
 
 # For reference
@@ -28,22 +28,10 @@ class JointLoss(nn.Module):
         self,
         data_mean: torch.Tensor,
         data_std: torch.Tensor,
-        use_joint_position_loss: bool = True,
-        use_bone_length_loss: bool = True,
-        use_foot_sliding_loss: bool = False,
-        foot_indices: list = [10, 11],
-        contact_threshold: float = 0.1,
-        lmb: dict = {"joint_position": 0.4, "bone_length": 0.6, "foot_sliding": 1.0},
     ) -> None:
         super(JointLoss, self).__init__()
         self.register_buffer("data_mean", data_mean)
         self.register_buffer("data_std", data_std)
-        self.use_joint_position_loss = use_joint_position_loss
-        self.use_bone_length_loss = use_bone_length_loss
-        self.use_foot_sliding_loss = use_foot_sliding_loss
-        self.foot_indices = foot_indices
-        self.contact_threshold = contact_threshold
-        self.lmb = lmb
 
     def _denorm_and_to_joints(self, motion: torch.Tensor) -> torch.Tensor:
         # import pdb; pdb.set_trace()
@@ -51,6 +39,25 @@ class JointLoss(nn.Module):
             motion * self.data_std[: motion.shape[-2], :]
             + self.data_mean[: motion.shape[-2], :],
         )
+    
+    def forward(self, motions: torch.Tensor, gts: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        bs, _, nfeats = motions.shape
+        
+        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, nfeats)
+        loss = torch.tensor(0.0, dtype=torch.float32, device=motions.device)
+
+        for i in range(bs):
+            mask = expanded_mask[i]
+            motion = motions[i][mask].view(-1, nfeats)
+            gt = gts[i][mask].view(-1, nfeats)
+            motion_root_grav_axis, motion_poses_features, motion_vel_angles, motion_vel_trajectory_local = ungroup(motion)
+            gt_root_grav_axis, gt_poses_features, gt_vel_angles, gt_vel_trajectory_local = ungroup(gt)
+            loss += F.mse_loss(motion_vel_trajectory_local, gt_vel_trajectory_local, reduction='mean')
+            loss += F.mse_loss(motion_vel_angles, gt_vel_angles, reduction='mean')
+            loss += F.mse_loss(motion_poses_features, gt_poses_features, reduction='mean')
+            loss += F.mse_loss(motion_root_grav_axis, gt_root_grav_axis, reduction='mean')
+        
+        return loss / bs
 
     @staticmethod
     def compute_bone_lengths(joints: torch.Tensor) -> torch.Tensor:
@@ -110,47 +117,47 @@ class JointLoss(nn.Module):
         metrics["mrpe"] = self.compute_mrpe(predicted_joints, gt_joints)
         return metrics
 
-    def forward(
-        self,
-        predicted_motion: torch.Tensor,
-        gt_motion: torch.Tensor,
-        mask: torch.Tensor,
-        return_joints: bool = False,
-    ) -> torch.Tensor:
-        # Denormalize and convert to joints
-        predicted_joints = self._denorm_and_to_joints(predicted_motion)
-        gt_joints = self._denorm_and_to_joints(gt_motion)
-
-        # Initialize loss
-        loss = torch.tensor(0.0, dtype=torch.float32, device=predicted_motion.device)
-
-        expanded_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, predicted_joints.size(-2), predicted_joints.size(-1))
-        masked_predicted_joints = predicted_joints[expanded_mask].view(-1, 54, 3)
-        masked_gt_joints = gt_joints[expanded_mask].view(-1, 54, 3)
+    # def forward(
+    #     self,
+    # ) -> torch.Tensor:
+    #     # expanded_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, predicted_joints.size(-2), predicted_joints.size(-1))
         
-        # Joint Position Loss
-        if self.use_joint_position_loss:
-            # import pdb; pdb.set_trace()
-            joint_position_loss = F.mse_loss(masked_predicted_joints, masked_gt_joints)
-            loss += self.lmb["joint_position"] * joint_position_loss
+    #     # Denormalize and convert to joints
+    #     predicted_joints = self._denorm_and_to_joints(predicted_motion)
+    #     gt_joints = self._denorm_and_to_joints(gt_motion)
 
-        # Bone Length Loss
-        if self.use_bone_length_loss:
-            predicted_lengths = self.compute_bone_lengths(masked_predicted_joints)
-            gt_lengths = self.compute_bone_lengths(masked_gt_joints)
-            bone_length_loss = F.mse_loss(predicted_lengths, gt_lengths)
-            loss += self.lmb["bone_length"] * bone_length_loss
+    #     # Initialize loss
+    #     loss = torch.tensor(0.0, dtype=torch.float32, device=predicted_motion.device)
 
-        # Foot Sliding Loss
-        if self.use_foot_sliding_loss:
-            foot_sliding_loss = self.compute_foot_sliding_loss(predicted_joints)
-            loss += self.lmb["foot_sliding"] * foot_sliding_loss
+    #     expanded_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, predicted_joints.size(-2), predicted_joints.size(-1))
+    #     masked_predicted_joints = predicted_joints[expanded_mask].view(-1, 54, 3)
+    #     masked_gt_joints = gt_joints[expanded_mask].view(-1, 54, 3)
+        
+    #     # root position
+    #     loss += F.mse_loss(masked_predicted_joints[:, 0, :], masked_gt_joints[:, 0, :])
+    #     # Joint Position Loss
+    #     if self.use_joint_position_loss:
+    #         # import pdb; pdb.set_trace()
+    #         joint_position_loss = F.mse_loss(masked_predicted_joints, masked_gt_joints)
+    #         loss += self.lmb["joint_position"] * joint_position_loss
 
-        # import pdb; pdb.set_trace()
-        if return_joints:
-            return loss, predicted_joints, gt_joints  # type: ignore
+    #     # Bone Length Loss
+    #     if self.use_bone_length_loss:
+    #         predicted_lengths = self.compute_bone_lengths(masked_predicted_joints)
+    #         gt_lengths = self.compute_bone_lengths(masked_gt_joints)
+    #         bone_length_loss = F.mse_loss(predicted_lengths, gt_lengths)
+    #         loss += self.lmb["bone_length"] * bone_length_loss
 
-        return loss
+    #     # Foot Sliding Loss
+    #     if self.use_foot_sliding_loss:
+    #         foot_sliding_loss = self.compute_foot_sliding_loss(predicted_joints)
+    #         loss += self.lmb["foot_sliding"] * foot_sliding_loss
+
+    #     # import pdb; pdb.set_trace()
+    #     if return_joints:
+    #         return loss, predicted_joints, gt_joints  # type: ignore
+
+    #     return loss
 
     def __repr__(self):
         return "JointLoss()"
