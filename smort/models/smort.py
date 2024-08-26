@@ -42,17 +42,7 @@ class SMORT(LightningModule):
 
         self.reactor_encoder = ACTORStyleEncoderWithCA(
             nfeats=nmotionfeats,
-            n_context_feats=ntextfeats,
-            vae=vae,
-            latent_dim=latent_dim,
-            ff_size=ff_size,
-            num_layers=num_layers,
-            num_heads=num_heads,
-            dropout=dropout,
-            activation=activation,
-        )
-        self.text_encoder = ACTORStyleEncoder(
-            nfeats=ntextfeats,
+            n_context_feats=nmotionfeats,
             vae=vae,
             latent_dim=latent_dim,
             ff_size=ff_size,
@@ -107,7 +97,7 @@ class SMORT(LightningModule):
     def forward(
         self,
         inputs: Dict,
-        input_type: Literal["reactor", "actor", "text"],
+        input_type: Literal["reactor", "actor"],
         context: Optional[Dict] = None,
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
@@ -163,18 +153,18 @@ class SMORT(LightningModule):
         mask = reactor_x_dict["mask"]
         ref_motions = reactor_x_dict["x"]
 
-        # encoder types: "reactor", "scene", "text"
-        # text -> motion
-        t_motions, t_latents, t_dists = self(
-            text_x_dict, "text", mask=mask, return_all=True
-        )
+        # encoder types: "reactor", "actor"
+        # # text -> motion
+        # t_motions, t_latents, t_dists = self(
+        #     text_x_dict, "text", mask=mask, return_all=True
+        # )
         # actor -> motion
         a_motions, a_latents, a_dists = self(
             actor_x_dict, "actor", text_x_dict, mask=mask, return_all=True
         )
-        # motion -> motion
+        # reactor -> motion
         m_motions, m_latents, m_dists = self(
-            reactor_x_dict, "reactor", text_x_dict, mask=mask, return_all=True
+            reactor_x_dict, "reactor", actor_x_dict, mask=mask, return_all=True
         )
 
         # Store all losses
@@ -183,7 +173,6 @@ class SMORT(LightningModule):
         # Reconstructions losses
         # fmt: off
         losses["recons"] = (
-            + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
             + self.reconstruction_loss_fn(a_motions, ref_motions) # actor -> motion
             + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
         )
@@ -203,17 +192,13 @@ class SMORT(LightningModule):
             ref_dists = (ref_mus, ref_logvar)
 
             losses["kl"] = (
-                self.kl_loss_fn(t_dists, m_dists)  # text_to_reactor
-                + self.kl_loss_fn(m_dists, t_dists)  # reactor_to_text
-                + self.kl_loss_fn(a_dists, t_dists)  # actor_to_text
-                + self.kl_loss_fn(t_dists, a_dists)  # text_to_actor
                 + self.kl_loss_fn(a_dists, ref_dists)  # actor
                 + self.kl_loss_fn(m_dists, ref_dists)  # reactor
-                + self.kl_loss_fn(t_dists, ref_dists)  # text
+                + self.kl_loss_fn(ref_dists, m_dists)
+                + self.kl_loss_fn(ref_dists, a_dists)
             )
 
         # Latent manifold loss
-        losses["latent_t"] = self.latent_loss_fn(t_latents, m_latents)
         losses["latent_a"] = self.latent_loss_fn(a_latents, m_latents)
 
         # Weighted average of the losses

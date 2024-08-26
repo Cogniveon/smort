@@ -29,8 +29,8 @@ class JointLoss(nn.Module):
         data_mean: torch.Tensor,
         data_std: torch.Tensor,
         use_joint_position_loss: bool = True,
-        use_bone_length_loss: bool = True,
-        use_foot_sliding_loss: bool = True,
+        use_bone_length_loss: bool = False,
+        use_foot_sliding_loss: bool = False,
         foot_indices: list = [10, 11],
         contact_threshold: float = 0.1,
         lmb: dict = {"joint_position": 1.0, "bone_length": 1.0, "foot_sliding": 1.0},
@@ -122,7 +122,7 @@ class JointLoss(nn.Module):
             loss += self.lmb["foot_sliding"] * foot_sliding_loss
 
         if return_joints:
-            return loss, predicted_joints, gt_joints
+            return loss, predicted_joints, gt_joints # type: ignore
 
         return loss
 
