@@ -43,9 +43,8 @@ class SMORT(LightningModule):
         self.fact = fact if fact is not None else 1.0
         self.sample_mean = sample_mean
 
-        self.reactor_encoder = ACTORStyleEncoderWithCA(
+        self.motion_encoder = ACTORStyleEncoder(
             nfeats=nmotionfeats,
-            n_context_feats=nmotionfeats,
             vae=vae,
             latent_dim=latent_dim,
             ff_size=ff_size,
@@ -54,9 +53,8 @@ class SMORT(LightningModule):
             dropout=dropout,
             activation=activation,
         )
-        self.text_encoder = ACTORStyleEncoderWithCA(
+        self.text_encoder = ACTORStyleEncoder(
             nfeats=ntextfeats,
-            n_context_feats=nmotionfeats,
             vae=vae,
             latent_dim=latent_dim,
             ff_size=ff_size,
@@ -98,7 +96,7 @@ class SMORT(LightningModule):
     def forward(
         self,
         inputs: Dict,
-        input_type: Literal["reactor", "text"],
+        input_type: Literal["motion", "text"],
         context: Optional[Dict] = None,
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
@@ -111,8 +109,8 @@ class SMORT(LightningModule):
 
         if input_type == "text":
             encoder = self.text_encoder
-        elif input_type == "actor":
-            encoder = self.actor_encoder
+        elif input_type == "motion":
+            encoder = self.motion_encoder
         else:
             encoder = self.reactor_encoder
 
@@ -165,11 +163,11 @@ class SMORT(LightningModule):
         # )
         # actor -> motion
         t_motions, t_latents, t_dists = self(
-            text_x_dict, "text", actor_x_dict, mask=mask, return_all=True
+            text_x_dict, "text", mask=mask, return_all=True
         )
         # reactor -> motion
         m_motions, m_latents, m_dists = self(
-            reactor_x_dict, "reactor", actor_x_dict, mask=mask, return_all=True
+            reactor_x_dict, "motion", mask=mask, return_all=True
         )
 
         # Store all losses
