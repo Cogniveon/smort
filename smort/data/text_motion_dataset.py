@@ -18,10 +18,12 @@ class TextMotionDataset(Dataset):
         eps: float = 1e-12,
         device: torch.device = torch.device("cpu"),
         use_tiny: bool = False,
+        return_scene: bool = False,
     ):
         self.collate_fn = collate_text_motion
         self.dataset_path = path
         self.motion_only = motion_only
+        self.return_scene = return_scene
         self.normalize = normalize
         self.use_tiny = use_tiny
         self.eps = eps
@@ -33,7 +35,7 @@ class TextMotionDataset(Dataset):
             assert type(motions_dataset) is h5py.Group
             num_scenes = len(list(motions_dataset.keys()))
             if self.use_tiny:
-                return math.floor(num_scenes * 0.4)
+                return math.floor(num_scenes * 0.1)
             else:
                 return num_scenes
 
@@ -84,6 +86,16 @@ class TextMotionDataset(Dataset):
                     "length": len(text),
                 }
 
+            if self.return_scene:
+                ret_dict['scene_x_dict'] = {}
+                ret_dict['scene_x_dict']['x'] = torch.cat((
+                    ret_dict['reactor_x_dict']['x'],
+                    ret_dict['actor_x_dict']['x'],
+                ), dim=1)
+                assert ret_dict['actor_x_dict']['length'] == ret_dict['actor_x_dict']['length']
+                ret_dict['scene_x_dict']['length'] = ret_dict['reactor_x_dict']['length']
+                # del ret_dict['reactor_x_dict']
+                # del ret_dict['actor_x_dict']
             return ret_dict
 
     def get_mean_std(

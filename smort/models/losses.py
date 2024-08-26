@@ -34,7 +34,7 @@ class JointLoss(nn.Module):
         self.register_buffer("data_mean", data_mean)
         self.register_buffer("data_std", data_std)
 
-    def _denorm_and_to_joints(self, motion: torch.Tensor) -> torch.Tensor:
+    def to_joints(self, motion: torch.Tensor) -> torch.Tensor:
         # import pdb; pdb.set_trace()
         return feats_to_joints(
             motion * self.data_std[: motion.shape[-2], :]
@@ -45,8 +45,8 @@ class JointLoss(nn.Module):
         bs, _, nfeats = motion.shape
         loss = torch.tensor(0.0, dtype=torch.float32, device=motion.device)
         for i in range(bs):
-            pred_joints = feats_to_joints(motion[i][mask[i], ...])
-            gt_joints = feats_to_joints(gt[i][mask[i], ...])
+            pred_joints = self.to_joints(motion[i][mask[i], ...])
+            gt_joints = self.to_joints(gt[i][mask[i], ...])
             
             # Root position
             loss += F.mse_loss(pred_joints[:, 0, :], gt_joints[:, 0, :], reduction="mean")

@@ -16,12 +16,14 @@ class InterXDataModule(pl.LightningDataModule):
         batch_size=32,
         num_workers=os.cpu_count(),
         use_tiny: bool = False,
+        return_scene: bool = False,
     ) -> None:
         super().__init__()
         self.dataset_file = dataset_file
         self.batch_size = batch_size
         self.num_workers = num_workers or 1
         self.use_tiny = use_tiny
+        self.return_scene = return_scene
 
     def prepare_data(self):
         if not os.path.exists(self.dataset_file):
@@ -32,7 +34,7 @@ class InterXDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         self.prepare_data()
-        self.dataset = TextMotionDataset(self.dataset_file, use_tiny=self.use_tiny)
+        self.dataset = TextMotionDataset(self.dataset_file, use_tiny=self.use_tiny, return_scene=self.return_scene)
 
         total_scenes = len(self.dataset)
         train_len = math.floor(total_scenes * 0.8)

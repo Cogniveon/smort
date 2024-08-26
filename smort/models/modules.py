@@ -85,6 +85,7 @@ class ACTORStyleEncoder(nn.Module):
         xseq = torch.cat((tokens, x), 1)
 
         token_mask = torch.ones((bs, self.nbtokens), dtype=bool, device=device)  # type: ignore
+        # import pdb; pdb.set_trace()
         aug_mask = torch.cat((token_mask, mask), 1)
 
         # add positional encoding
