@@ -1,3 +1,4 @@
+import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -40,23 +41,18 @@ class JointLoss(nn.Module):
             + self.data_mean[: motion.shape[-2], :],
         )
     
-    def forward(self, motions: torch.Tensor, gts: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        bs, _, nfeats = motions.shape
-        
-        expanded_mask = mask.unsqueeze(-1).expand(-1, -1, nfeats)
-        loss = torch.tensor(0.0, dtype=torch.float32, device=motions.device)
-
+    def forward(self, motion: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):
+        bs, _, nfeats = motion.shape
+        loss = torch.tensor(0.0, dtype=torch.float32, device=motion.device)
         for i in range(bs):
-            mask = expanded_mask[i]
-            motion = motions[i][mask].view(-1, nfeats)
-            gt = gts[i][mask].view(-1, nfeats)
-            motion_root_grav_axis, motion_poses_features, motion_vel_angles, motion_vel_trajectory_local = ungroup(motion)
-            gt_root_grav_axis, gt_poses_features, gt_vel_angles, gt_vel_trajectory_local = ungroup(gt)
-            loss += F.mse_loss(motion_vel_trajectory_local, gt_vel_trajectory_local, reduction='mean')
-            loss += F.mse_loss(motion_vel_angles, gt_vel_angles, reduction='mean')
-            loss += F.mse_loss(motion_poses_features, gt_poses_features, reduction='mean')
-            loss += F.mse_loss(motion_root_grav_axis, gt_root_grav_axis, reduction='mean')
-        
+            pred_joints = feats_to_joints(motion[i][mask[i], ...])
+            gt_joints = feats_to_joints(gt[i][mask[i], ...])
+            
+            # Root position
+            loss += F.mse_loss(pred_joints[:, 0, :], gt_joints[:, 0, :], reduction="mean")
+            # Other joints
+            loss += F.mse_loss(pred_joints[:, 1:, :], gt_joints[:, 1:, :], reduction="mean")
+            
         return loss / bs
 
     @staticmethod

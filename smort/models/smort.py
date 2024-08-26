@@ -150,7 +150,7 @@ class SMORT(LightningModule):
     def compute_loss(
         self,
         batch: Dict,
-    ) -> dict:
+    ) -> tuple[dict, torch.Tensor, torch.Tensor]:
         text_x_dict = batch["text_x_dict"]
         actor_x_dict = batch["actor_x_dict"]
         reactor_x_dict = batch["reactor_x_dict"]
@@ -182,8 +182,8 @@ class SMORT(LightningModule):
             + self.reconstruction_loss_fn(m_motions, ref_motions) # reactor -> motion
         )
         # fmt: on
-        
-        losses["joint"] = self.joint_loss_fn(m_motions, ref_motions, mask)
+
+        losses["joint"] = self.joint_loss_fn.forward(m_motions, ref_motions, mask)
 
         # VAE losses
         if self.vae:
@@ -208,17 +208,21 @@ class SMORT(LightningModule):
             self.lmd[x] * val for x, val in losses.items() if x in self.lmd
         )
 
-        return losses
+        return losses, m_motions, ref_motions
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        losses = self.compute_loss(batch)
-        
-        # if batch_idx == 0:
-        #     random_idx = random.randint(0, bs - 1)
-        #     # import pdb; pdb.set_trace()
-        #     self.render_motion(joints[random_idx], gt_joints[random_idx], "local_train_viz.mp4")
 
+        losses, pred_motions, gt_motions = self.compute_loss(batch)
+        # import pdb; pdb.set_trace()
+        if batch_idx == 0:
+            randidx = random.randint(0, bs - 1)
+            pred_joints, gt_joints = (
+                self.joint_loss_fn._denorm_and_to_joints(pred_motions[randidx]),
+                self.joint_loss_fn._denorm_and_to_joints(gt_motions[randidx]),
+            )
+            self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
+        assert type(losses) is dict
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
@@ -245,9 +249,17 @@ class SMORT(LightningModule):
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        losses = self.compute_loss(
-            batch
-        )
+
+        losses, pred_motions, gt_motions = self.compute_loss(batch)
+        # import pdb; pdb.set_trace()
+        if batch_idx == 0:
+            randidx = random.randint(0, bs - 1)
+            pred_joints, gt_joints = (
+                self.joint_loss_fn._denorm_and_to_joints(pred_motions[randidx]),
+                self.joint_loss_fn._denorm_and_to_joints(gt_motions[randidx]),
+            )
+            self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
+        assert type(losses) is dict
         # if batch_idx == 0:
         #     random_idx = random.randint(0, bs - 1)
         #     # import pdb; pdb.set_trace()
