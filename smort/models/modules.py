@@ -149,8 +149,9 @@ class ACTORStyleDecoder(nn.Module):
         )
 
         output = self.final_layer(output)
+        # import pdb; pdb.set_trace()
         # zero for padded area
-        output[~mask] = 0
+        output[~mask.unsqueeze(-1).expand_as(output)] = 0
         return output
 
 

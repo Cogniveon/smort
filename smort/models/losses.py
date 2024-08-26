@@ -29,11 +29,11 @@ class JointLoss(nn.Module):
         data_mean: torch.Tensor,
         data_std: torch.Tensor,
         use_joint_position_loss: bool = True,
-        use_bone_length_loss: bool = False,
+        use_bone_length_loss: bool = True,
         use_foot_sliding_loss: bool = False,
         foot_indices: list = [10, 11],
         contact_threshold: float = 0.1,
-        lmb: dict = {"joint_position": 1.0, "bone_length": 1.0, "foot_sliding": 1.0},
+        lmb: dict = {"joint_position": 0.4, "bone_length": 0.6, "foot_sliding": 1.0},
     ) -> None:
         super(JointLoss, self).__init__()
         self.register_buffer("data_mean", data_mean)
@@ -124,19 +124,20 @@ class JointLoss(nn.Module):
         # Initialize loss
         loss = torch.tensor(0.0, dtype=torch.float32, device=predicted_motion.device)
 
+        expanded_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, predicted_joints.size(-2), predicted_joints.size(-1))
+        masked_predicted_joints = predicted_joints[expanded_mask].view(-1, 54, 3)
+        masked_gt_joints = gt_joints[expanded_mask].view(-1, 54, 3)
+        
         # Joint Position Loss
         if self.use_joint_position_loss:
             # import pdb; pdb.set_trace()
-            expanded_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, predicted_joints.size(-2), predicted_joints.size(-1))
-            masked_predicted_joints = predicted_joints[expanded_mask].view(-1, 54, 3)
-            masked_gt_joints = gt_joints[expanded_mask].view(-1, 54, 3)
             joint_position_loss = F.mse_loss(masked_predicted_joints, masked_gt_joints)
             loss += self.lmb["joint_position"] * joint_position_loss
 
         # Bone Length Loss
         if self.use_bone_length_loss:
-            predicted_lengths = self.compute_bone_lengths(predicted_joints)
-            gt_lengths = self.compute_bone_lengths(gt_joints)
+            predicted_lengths = self.compute_bone_lengths(masked_predicted_joints)
+            gt_lengths = self.compute_bone_lengths(masked_gt_joints)
             bone_length_loss = F.mse_loss(predicted_lengths, gt_lengths)
             loss += self.lmb["bone_length"] * bone_length_loss
 

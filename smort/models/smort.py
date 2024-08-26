@@ -12,7 +12,7 @@ from smort.models.modules import (
     ACTORStyleEncoder,
     ACTORStyleEncoderWithCA,
 )
-from smort.renderer.matplotlib import SingleMotionRenderer
+from smort.renderer.matplotlib import SceneRenderer
 from smort.rifke import feats_to_joints
 
 
@@ -88,9 +88,7 @@ class SMORT(LightningModule):
         self.lmd = lmd
         self.lr = lr
 
-        self.renderer = SingleMotionRenderer(
-            colors=("red", "red", "red", "red", "red"),
-        )
+        self.renderer = SceneRenderer()
 
     def configure_optimizers(self):
         return {
@@ -139,6 +137,7 @@ class SMORT(LightningModule):
             dists = None
             (latent_vectors,) = encoded.unbind(1)
 
+        # import pdb; pdb.set_trace()
         mask = mask if mask is not None else length_to_mask(lengths, device=self.device)
         z_dict = {"z": latent_vectors, "mask": mask}
         motions = self.motion_decoder(z_dict)
@@ -241,7 +240,13 @@ class SMORT(LightningModule):
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        (losses,) = self.compute_loss(batch)
+        (losses, joints, gt_joints) = self.compute_loss(batch, return_joints=True)
+        
+        if batch_idx == 0:
+            random_idx = random.randint(0, bs - 1)
+            # import pdb; pdb.set_trace()
+            self.render_motion(joints[random_idx], gt_joints[random_idx], "local_train_viz.mp4")
+
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
@@ -255,13 +260,15 @@ class SMORT(LightningModule):
             )
         return losses["loss"]
 
-    def render_motion(self, motion: torch.Tensor, output=None):
+    def render_motion(self, motion: torch.Tensor, gt: torch.Tensor, output=None):
         if output is None:
             assert self.logger is not None
             output = "viz.mp4"
 
-        self.renderer.render_animation_single(
-            motion.detach().cpu().numpy(), output=output
+        self.renderer.render_animation(
+            gt.detach().cpu().numpy(),
+            motion.detach().cpu().numpy(),
+            output=output,
         )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
@@ -273,8 +280,7 @@ class SMORT(LightningModule):
         if batch_idx == 0:
             random_idx = random.randint(0, bs - 1)
             # import pdb; pdb.set_trace()
-            self.render_motion(joints[random_idx], "viz.mp4")
-            self.render_motion(gt_joints[random_idx], "gt.mp4")
+            self.render_motion(joints[random_idx], gt_joints[random_idx], "local_val_viz.mp4")
 
         for metric_name in sorted(metrics):
             loss_val = metrics[metric_name]
