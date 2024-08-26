@@ -7,8 +7,11 @@ from torch.optim.adamw import AdamW
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
-from smort.models.modules import (ACTORStyleDecoder, ACTORStyleEncoder,
-                                  ACTORStyleEncoderWithCA)
+from smort.models.modules import (
+    ACTORStyleDecoder,
+    ACTORStyleEncoder,
+    ACTORStyleEncoderWithCA,
+)
 from smort.renderer.matplotlib import SingleMotionRenderer
 from smort.rifke import feats_to_joints
 
@@ -186,10 +189,14 @@ class SMORT(LightningModule):
 
         if return_joints or return_metrics:
             losses["joints"], m_joints, ref_joints = self.joint_loss_fn.forward(
-                m_motions, ref_motions, return_joints=True
+                m_motions, ref_motions, mask=mask, return_joints=True
             )
         else:
-            losses["joints"] = self.joint_loss_fn.forward(m_motions, ref_motions)
+            losses["joints"] = self.joint_loss_fn.forward(
+                m_motions,
+                ref_motions,
+                mask=mask,
+            )
 
         # VAE losses
         if self.vae:

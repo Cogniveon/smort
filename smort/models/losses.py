@@ -46,6 +46,7 @@ class JointLoss(nn.Module):
         self.lmb = lmb
 
     def _denorm_and_to_joints(self, motion: torch.Tensor) -> torch.Tensor:
+        # import pdb; pdb.set_trace()
         return feats_to_joints(
             motion * self.data_std[: motion.shape[-2], :]
             + self.data_mean[: motion.shape[-2], :],
@@ -113,6 +114,7 @@ class JointLoss(nn.Module):
         self,
         predicted_motion: torch.Tensor,
         gt_motion: torch.Tensor,
+        mask: torch.Tensor,
         return_joints: bool = False,
     ) -> torch.Tensor:
         # Denormalize and convert to joints
@@ -121,11 +123,14 @@ class JointLoss(nn.Module):
 
         # Initialize loss
         loss = torch.tensor(0.0, dtype=torch.float32, device=predicted_motion.device)
-        # import pdb; pdb.set_trace()
 
         # Joint Position Loss
         if self.use_joint_position_loss:
-            joint_position_loss = F.mse_loss(predicted_joints, gt_joints)
+            # import pdb; pdb.set_trace()
+            expanded_mask = mask.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, predicted_joints.size(-2), predicted_joints.size(-1))
+            masked_predicted_joints = predicted_joints[expanded_mask].view(-1, 54, 3)
+            masked_gt_joints = gt_joints[expanded_mask].view(-1, 54, 3)
+            joint_position_loss = F.mse_loss(masked_predicted_joints, masked_gt_joints)
             loss += self.lmb["joint_position"] * joint_position_loss
 
         # Bone Length Loss
