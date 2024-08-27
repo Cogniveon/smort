@@ -87,7 +87,7 @@ class JointLoss(nn.Module):
             gt_joints = self.to_joints(gt[i][mask[i], ...])
 
             loss += self.get_root_position_loss(pred_joints, gt_joints)
-            loss += self.get_foot_contact_loss(pred_joints, gt_joints)
+            # loss += self.get_foot_contact_loss(pred_joints, gt_joints)
             loss += F.mse_loss(
                 pred_joints[:, joint_selection, :],
                 gt_joints[:, joint_selection, :],
