@@ -16,6 +16,17 @@ from smort.renderer.matplotlib import SceneRenderer
 from smort.rifke import feats_to_joints
 
 
+def cosine_annealing_lambda(epoch: int, num_epochs: int, initial_lambda: float) -> torch.Tensor:
+    """
+    Returns a lambda value based on a cosine annealing schedule.
+    :param epoch: Current epoch.
+    :param num_epochs: Total number of epochs.
+    :param initial_lambda: Initial value of lambda.
+    :return: Adjusted lambda value.
+    """
+    return initial_lambda * 0.5 * (1 + torch.cos(torch.tensor(epoch * 3.14159265 / num_epochs)))
+
+
 class SMORT(LightningModule):
     def __init__(
         self,
@@ -25,7 +36,7 @@ class SMORT(LightningModule):
         ntextfeats: int = 768,
         latent_dim: int = 512,
         ff_size: int = 1024,
-        num_layers: int = 6,
+        num_layers: int = 8,
         num_heads: int = 16,
         dropout: float = 0.1,
         activation: str = "gelu",
@@ -207,6 +218,16 @@ class SMORT(LightningModule):
 
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
+        current_epoch = self.trainer.current_epoch
+        max_epochs = self.trainer.max_epochs or 100
+        
+        # Update lambda values using cosine annealing schedule
+        recons_lambda = cosine_annealing_lambda(current_epoch, max_epochs, self.lmd["recons"])
+        joint_lambda = cosine_annealing_lambda(current_epoch, max_epochs, self.lmd["joint"])
+
+        # Apply the updated lambda values
+        self.lmd["recons"] = recons_lambda
+        self.lmd["joint"] = joint_lambda
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         # import pdb; pdb.set_trace()

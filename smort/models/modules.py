@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, OrderedDict
 
 import numpy as np
 import torch
@@ -180,7 +180,16 @@ class ACTORStyleEncoderWithCA(ACTORStyleEncoder):
             activation,
         )
         self.context_linear = nn.Linear(n_context_feats, n_context_feats)
-        self.context_projection = nn.Linear(n_context_feats, latent_dim)
+        self.context_linear = nn.Linear(n_context_feats, n_context_feats)
+        self.context_projection = nn.Sequential(
+            OrderedDict(
+                [
+                    ("conv1", nn.Linear(n_context_feats, n_context_feats)),
+                    ("gelu1", nn.GELU()),
+                    ("conv2", nn.Linear(n_context_feats, latent_dim)),
+                ]
+            )
+        )
         self.cross_attention = nn.MultiheadAttention(
             embed_dim=latent_dim,
             num_heads=num_heads,

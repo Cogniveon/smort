@@ -4,5 +4,5 @@ defaults:
 _target_: smort.data.data_module.InterXDataModule
 dataset_file: deps/interx/processed/dataset_2k.h5
 batch_size: 1
-use_tiny: true
+use_tiny: 0.4
 return_scene: true

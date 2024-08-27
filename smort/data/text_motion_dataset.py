@@ -17,7 +17,7 @@ class TextMotionDataset(Dataset):
         normalize: bool = True,
         eps: float = 1e-12,
         device: torch.device = torch.device("cpu"),
-        use_tiny: bool = False,
+        use_tiny: bool | float = False,
         return_scene: bool = False,
     ):
         self.collate_fn = collate_text_motion
@@ -25,7 +25,7 @@ class TextMotionDataset(Dataset):
         self.motion_only = motion_only
         self.return_scene = return_scene
         self.normalize = normalize
-        self.use_tiny = use_tiny
+        self.use_tiny = use_tiny if type(use_tiny) == float else 0.1
         self.eps = eps
         self.device = device
 
@@ -35,7 +35,7 @@ class TextMotionDataset(Dataset):
             assert type(motions_dataset) is h5py.Group
             num_scenes = len(list(motions_dataset.keys()))
             if self.use_tiny:
-                return math.floor(num_scenes * 0.1)
+                return math.floor(num_scenes * self.use_tiny)
             else:
                 return num_scenes
 

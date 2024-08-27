@@ -12,7 +12,7 @@
             "args": [
                 "data.batch_size=2",
                 "data.dataset_file=deps/interx/processed/dataset_2k.h5",
-                "data.use_tiny=true",
+                "data.use_tiny=0.8",
                 "trainer.accelerator=cpu"
             ],
             "console": "integratedTerminal",

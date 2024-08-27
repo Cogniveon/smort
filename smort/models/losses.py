@@ -41,17 +41,42 @@ class JointLoss(nn.Module):
             + self.data_mean[: motion.shape[-2], :],
         )
     
+    def get_root_position_loss(self, pred_joints: torch.Tensor, gt_joints: torch.Tensor):
+        # Trajectory
+        loss = F.mse_loss(pred_joints[..., 0, [0, 1]], gt_joints[..., 0, [0, 1]], reduction="mean")
+        # height
+        loss += F.mse_loss(pred_joints[..., 0, [2]], gt_joints[..., 0, [2]], reduction="mean")
+        return loss
+    
+    def get_foot_contact_loss(self, pred_joints: torch.Tensor, gt_joints: torch.Tensor, feet_indices: list = [7, 8, 10, 11], ground_threshold=0.01):
+        # Ensure that feet joints are close to the ground (y-coordinate close to 0)
+        # For simplicity, we assume ground level is at y < 0.01
+        relevant_pred_joints = pred_joints[:, feet_indices, :]
+        relevant_gt_joints = gt_joints[:, feet_indices, :]
+        
+        pred_vel = relevant_pred_joints[1:, :, :] - relevant_pred_joints[:-1, :, :]
+        gt_vel = relevant_gt_joints[1:, :, :] - relevant_gt_joints[:-1, :, :]
+        gt_vel_norm = torch.linalg.norm(gt_vel, dim=2)
+        
+        fc_mask = (gt_vel_norm <= ground_threshold).unsqueeze(2).expand(-1, -1, 3)
+        masked_pred_vel = pred_vel.clone()
+        masked_pred_vel[~fc_mask] = 0
+        
+        return F.mse_loss(masked_pred_vel, torch.zeros_like(masked_pred_vel), reduction="mean")
+
     def forward(self, motion: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):
         bs, _, nfeats = motion.shape
         loss = torch.tensor(0.0, dtype=torch.float32, device=motion.device)
+        # Select some important joints
+        joint_selection = [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 17, 18, 19, 20, 21, 15]
+        
         for i in range(bs):
             pred_joints = self.to_joints(motion[i][mask[i], ...])
             gt_joints = self.to_joints(gt[i][mask[i], ...])
             
-            # Root position
-            loss += F.mse_loss(pred_joints[:, 0, :], gt_joints[:, 0, :], reduction="mean")
-            # Other joints
-            loss += F.mse_loss(pred_joints[:, 1:, :], gt_joints[:, 1:, :], reduction="mean")
+            loss += self.get_root_position_loss(pred_joints, gt_joints)
+            loss += self.get_foot_contact_loss(pred_joints, gt_joints)
+            loss += F.mse_loss(pred_joints[:, joint_selection, :], gt_joints[:, joint_selection, :], reduction="mean")
             
         return loss / bs
 
