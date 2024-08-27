@@ -319,7 +319,6 @@ class SceneRenderer:
         canonicalize: bool = False,
         render_batch: bool = True,
         agg=True,
-        return_frames: bool = False,
     ):
         if agg:
             import matplotlib
@@ -363,7 +362,6 @@ class SceneRenderer:
         lines1 = []
         lines2 = []
         initialized = False
-        ret_frames = []
 
         def update(frame):
             nonlocal initialized
@@ -439,12 +437,6 @@ class SceneRenderer:
 
             initialized = True
 
-            if return_frames:
-                fig.canvas.draw()
-                image = np.frombuffer(fig.canvas.tostring_rgb(), dtype="uint8")  # type: ignore
-                image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-                ret_frames.append(image)
-
         # fig.tight_layout()
         frames = min(joints1.shape[0], joints2.shape[0])
         anim = FuncAnimation(fig, update, frames=frames, interval=1000 / fps, repeat=False)  # type: ignore
@@ -457,4 +449,3 @@ class SceneRenderer:
             anim.save(output, fps=int(fps))
 
         plt.close()
-        return np.array(ret_frames)

@@ -46,7 +46,7 @@ class SMORT(LightningModule):
         latent_dim: int = 512,
         ff_size: int = 1024,
         num_layers: int = 8,
-        num_heads: int = 16,
+        num_heads: int = 8,
         dropout: float = 0.1,
         activation: str = "gelu",
         vae: bool = True,
@@ -285,14 +285,8 @@ class SMORT(LightningModule):
                     gt_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
                 ),
             )
-            video_tensor = self.render_motion(
+            self.render_motion(
                 pred_joints, gt_joints, "local_train_viz.mp4"
-            )
-            self.logger.experiment.add_video(  # type: ignore
-                "train_motion",
-                video_tensor,
-                global_step=self.current_epoch,
-                fps=40,
             )
 
         for loss_name in sorted(losses):
@@ -312,14 +306,11 @@ class SMORT(LightningModule):
             assert self.logger is not None
             output = "viz.mp4"
 
-        frames = self.renderer.render_animation(
+        self.renderer.render_animation(
             gt.detach().cpu().numpy(),
             motion.detach().cpu().numpy(),
             output=output,
-            return_frames=True,
         )
-        video_tensor = torch.from_numpy(frames).permute(0, 3, 1, 2).unsqueeze(0)
-        return video_tensor
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
@@ -340,14 +331,8 @@ class SMORT(LightningModule):
                     gt_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
                 ),
             )
-            video_tensor = self.render_motion(
+            self.render_motion(
                 pred_joints, gt_joints, "local_val_viz.mp4"
-            )
-            self.logger.experiment.add_video(  # type: ignore
-                "val_motion",
-                video_tensor,
-                global_step=self.current_epoch,
-                fps=40,
             )
 
             metrics = self.joint_loss_fn.evaluate_metrics(
