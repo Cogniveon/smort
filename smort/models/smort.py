@@ -5,6 +5,7 @@ from typing import Dict, List, Literal, Optional
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
@@ -29,10 +30,12 @@ def cosine_annealing_lambda(
     :param initial_lambda: Initial value of lambda.
     :return: Adjusted lambda value.
     """
-    return (
-        initial_lambda
-        * 0.5
-        * (1 + torch.cos(torch.tensor(epoch * 3.14159265 / num_epochs)))
+    return torch.abs(
+        (
+            initial_lambda
+            * 0.5
+            * (1 + torch.cos(torch.tensor(epoch * 3.14159265 / num_epochs)))
+        ) - 1
     )
 
 
@@ -52,7 +55,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joint": 1.0e-3, "latent": 1.0e-5, "kl": 1.0e-5},
+        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-5},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
@@ -110,8 +113,10 @@ class SMORT(LightningModule):
         self.renderer = SceneRenderer()
 
     def configure_optimizers(self):
+        optimizer = AdamW(lr=self.lr, params=self.parameters())
         return {
-            "optimizer": AdamW(lr=self.lr, params=self.parameters()),
+            "optimizer": optimizer,
+            "lr_scheduler": CosineAnnealingLR(optimizer, self.trainer.max_epochs or 100)
         }
 
     def forward(
