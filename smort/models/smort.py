@@ -1,3 +1,4 @@
+import logging
 import random
 from typing import Dict, List, Literal, Optional
 
@@ -7,9 +8,15 @@ from torch.optim.adamw import AdamW
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
-from smort.models.modules import (ACTORStyleDecoder, ACTORStyleEncoder,
-                                  ACTORStyleEncoderWithCA)
+from smort.models.modules import (
+    ACTORStyleDecoder,
+    ACTORStyleEncoder,
+    ACTORStyleEncoderWithCA,
+)
 from smort.renderer.matplotlib import SceneRenderer
+
+
+logger = logging.getLogger(__name__)
 
 
 def cosine_annealing_lambda(
@@ -245,14 +252,6 @@ class SMORT(LightningModule):
         self.lmd["joint"] = joint_lambda
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
-        # import pdb; pdb.set_trace()
-        # if batch_idx == 0:
-        #     randidx = random.randint(0, bs - 1)
-        #     pred_joints, gt_joints = (
-        #         self.joint_loss_fn._denorm_and_to_joints(pred_motions[randidx]),
-        #         self.joint_loss_fn._denorm_and_to_joints(gt_motions[randidx]),
-        #     )
-        #     self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
         assert type(losses) is dict
 
         self.log(
@@ -262,7 +261,21 @@ class SMORT(LightningModule):
             "lambda_joint", joint_lambda, on_epoch=True, on_step=False, batch_size=bs
         )
 
-        if (self.trainer.current_epoch + 1) % 5 == 0 and batch_idx == 0:
+        if (
+            (self.trainer.current_epoch) % 5 == 0
+            or self.trainer.current_epoch + 1 == self.trainer.max_epochs
+        ) and batch_idx == 0:
+            # Log lambda values
+            logger.info(
+                f"Epoch {current_epoch} - Lambda Recons: {recons_lambda}, Lambda Joint: {joint_lambda}"
+            )
+
+            # Log the current epoch's losses
+            for loss_name, loss_val in losses.items():
+                logger.info(
+                    f"Epoch {current_epoch} - Batch {batch_idx} - Loss {loss_name}: {loss_val.item()}"
+                )
+
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 self.joint_loss_fn.to_joints(
@@ -312,8 +325,12 @@ class SMORT(LightningModule):
         bs = len(batch["reactor_x_dict"]["x"])
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
+
         # import pdb; pdb.set_trace()
-        if (self.trainer.current_epoch + 1) % 5 == 0 and batch_idx == 0:
+        if (
+            (self.trainer.current_epoch) % 5 == 0
+            or self.trainer.current_epoch + 1 == self.trainer.max_epochs
+        ) and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 self.joint_loss_fn.to_joints(
@@ -345,6 +362,19 @@ class SMORT(LightningModule):
                     on_step=False,
                     batch_size=bs,
                 )
+
+            # Log the current epoch's losses
+            for loss_name, loss_val in losses.items():
+                logger.info(
+                    f"Val Epoch {self.trainer.current_epoch} - Loss {loss_name}: {loss_val.item()}"
+                )
+
+            # Log the current epoch's losses
+            for metric_name, metric_val in metrics.items():
+                logger.info(
+                    f"Val Epoch {self.trainer.current_epoch} - Metric {metric_name}: {metric_val.item()}"
+                )
+
         assert type(losses) is dict
         # if batch_idx == 0:
         #     random_idx = random.randint(0, bs - 1)
