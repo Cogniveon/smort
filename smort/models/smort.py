@@ -52,7 +52,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joint": 1.0e-5, "latent": 1.0e-5, "kl": 1.0e-5},
+        lmd: Dict = {"recons": 1, "joint": 1.0e-3, "latent": 1.0e-5, "kl": 1.0e-5},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
@@ -239,24 +239,15 @@ class SMORT(LightningModule):
         current_epoch = self.trainer.current_epoch
         max_epochs = self.trainer.max_epochs or 100
 
-        # Update lambda values using cosine annealing schedule
-        recons_lambda = cosine_annealing_lambda(
-            current_epoch, max_epochs, self.lmd["recons"]
-        )
         joint_lambda = cosine_annealing_lambda(
             current_epoch, max_epochs, self.lmd["joint"]
         )
 
-        # Apply the updated lambda values
-        self.lmd["recons"] = recons_lambda
         self.lmd["joint"] = joint_lambda
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         assert type(losses) is dict
 
-        self.log(
-            "lambda_recons", recons_lambda, on_epoch=True, on_step=False, batch_size=bs
-        )
         self.log(
             "lambda_joint", joint_lambda, on_epoch=True, on_step=False, batch_size=bs
         )
@@ -265,9 +256,8 @@ class SMORT(LightningModule):
             (self.trainer.current_epoch) % 5 == 0
             or self.trainer.current_epoch + 1 == self.trainer.max_epochs
         ) and batch_idx == 0:
-            # Log lambda values
             logger.info(
-                f"Epoch {current_epoch} - Lambda Recons: {recons_lambda}, Lambda Joint: {joint_lambda}"
+                f"Epoch {current_epoch} - Lambda Joint: {joint_lambda}"
             )
 
             # Log the current epoch's losses
