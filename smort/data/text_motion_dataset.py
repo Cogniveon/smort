@@ -87,13 +87,21 @@ class TextMotionDataset(Dataset):
                 }
 
             if self.return_scene:
-                ret_dict['scene_x_dict'] = {}
-                ret_dict['scene_x_dict']['x'] = torch.cat((
-                    ret_dict['reactor_x_dict']['x'],
-                    ret_dict['actor_x_dict']['x'],
-                ), dim=1)
-                assert ret_dict['actor_x_dict']['length'] == ret_dict['actor_x_dict']['length']
-                ret_dict['scene_x_dict']['length'] = ret_dict['reactor_x_dict']['length']
+                ret_dict["scene_x_dict"] = {}
+                ret_dict["scene_x_dict"]["x"] = torch.cat(
+                    (
+                        ret_dict["reactor_x_dict"]["x"],
+                        ret_dict["actor_x_dict"]["x"],
+                    ),
+                    dim=1,
+                )
+                assert (
+                    ret_dict["actor_x_dict"]["length"]
+                    == ret_dict["actor_x_dict"]["length"]
+                )
+                ret_dict["scene_x_dict"]["length"] = ret_dict["reactor_x_dict"][
+                    "length"
+                ]
                 # del ret_dict['reactor_x_dict']
                 # del ret_dict['actor_x_dict']
             return ret_dict

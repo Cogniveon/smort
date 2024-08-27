@@ -34,7 +34,9 @@ class InterXDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         self.prepare_data()
-        self.dataset = TextMotionDataset(self.dataset_file, use_tiny=self.use_tiny, return_scene=self.return_scene)
+        self.dataset = TextMotionDataset(
+            self.dataset_file, use_tiny=self.use_tiny, return_scene=self.return_scene
+        )
 
         total_scenes = len(self.dataset)
         train_len = math.floor(total_scenes * 0.8)

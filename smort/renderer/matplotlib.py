@@ -438,10 +438,10 @@ class SceneRenderer:
             spline_line2.set_3d_properties(np.zeros_like(trajectory2[left:right, 0]))
 
             initialized = True
-            
+
             if return_frames:
                 fig.canvas.draw()
-                image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8') # type: ignore
+                image = np.frombuffer(fig.canvas.tostring_rgb(), dtype="uint8")  # type: ignore
                 image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
                 ret_frames.append(image)
 

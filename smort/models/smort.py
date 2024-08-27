@@ -7,16 +7,14 @@ from torch.optim.adamw import AdamW
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
-from smort.models.modules import (
-    ACTORStyleDecoder,
-    ACTORStyleEncoder,
-    ACTORStyleEncoderWithCA,
-)
+from smort.models.modules import (ACTORStyleDecoder, ACTORStyleEncoder,
+                                  ACTORStyleEncoderWithCA)
 from smort.renderer.matplotlib import SceneRenderer
-from smort.rifke import feats_to_joints
 
 
-def cosine_annealing_lambda(epoch: int, num_epochs: int, initial_lambda: float) -> torch.Tensor:
+def cosine_annealing_lambda(
+    epoch: int, num_epochs: int, initial_lambda: float
+) -> torch.Tensor:
     """
     Returns a lambda value based on a cosine annealing schedule.
     :param epoch: Current epoch.
@@ -24,7 +22,11 @@ def cosine_annealing_lambda(epoch: int, num_epochs: int, initial_lambda: float) 
     :param initial_lambda: Initial value of lambda.
     :return: Adjusted lambda value.
     """
-    return initial_lambda * 0.5 * (1 + torch.cos(torch.tensor(epoch * 3.14159265 / num_epochs)))
+    return (
+        initial_lambda
+        * 0.5
+        * (1 + torch.cos(torch.tensor(epoch * 3.14159265 / num_epochs)))
+    )
 
 
 class SMORT(LightningModule):
@@ -171,11 +173,18 @@ class SMORT(LightningModule):
         # )
         # actor -> motion
         t_motions, t_latents, t_dists = self(
-            batch["text_x_dict"], "text", context=batch["actor_x_dict"], mask=batch["reactor_x_dict"]['mask'], return_all=True
+            batch["text_x_dict"],
+            "text",
+            context=batch["actor_x_dict"],
+            mask=batch["reactor_x_dict"]["mask"],
+            return_all=True,
         )
         # scene -> motion
         m_motions, m_latents, m_dists = self(
-            batch["scene_x_dict"], "scene", mask=batch["reactor_x_dict"]['mask'], return_all=True
+            batch["scene_x_dict"],
+            "scene",
+            mask=batch["reactor_x_dict"]["mask"],
+            return_all=True,
         )
 
         # Store all losses
@@ -189,7 +198,9 @@ class SMORT(LightningModule):
         )
         # fmt: on
 
-        losses["joint"] = self.joint_loss_fn.forward(t_motions, ref_motions, batch["reactor_x_dict"]['mask'])
+        losses["joint"] = self.joint_loss_fn.forward(
+            t_motions, ref_motions, batch["reactor_x_dict"]["mask"]
+        )
 
         # VAE losses
         if self.vae:
@@ -220,10 +231,14 @@ class SMORT(LightningModule):
         bs = len(batch["reactor_x_dict"]["x"])
         current_epoch = self.trainer.current_epoch
         max_epochs = self.trainer.max_epochs or 100
-        
+
         # Update lambda values using cosine annealing schedule
-        recons_lambda = cosine_annealing_lambda(current_epoch, max_epochs, self.lmd["recons"])
-        joint_lambda = cosine_annealing_lambda(current_epoch, max_epochs, self.lmd["joint"])
+        recons_lambda = cosine_annealing_lambda(
+            current_epoch, max_epochs, self.lmd["recons"]
+        )
+        joint_lambda = cosine_annealing_lambda(
+            current_epoch, max_epochs, self.lmd["joint"]
+        )
 
         # Apply the updated lambda values
         self.lmd["recons"] = recons_lambda
@@ -240,23 +255,33 @@ class SMORT(LightningModule):
         #     self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
         assert type(losses) is dict
 
-        self.log("lambda_recons", recons_lambda, on_epoch=True, on_step=False, batch_size=bs)
-        self.log("lambda_joint", joint_lambda, on_epoch=True, on_step=False, batch_size=bs)
+        self.log(
+            "lambda_recons", recons_lambda, on_epoch=True, on_step=False, batch_size=bs
+        )
+        self.log(
+            "lambda_joint", joint_lambda, on_epoch=True, on_step=False, batch_size=bs
+        )
 
-        if self.trainer.current_epoch % 5 == 0 and batch_idx == 0:
+        if (self.trainer.current_epoch + 1) % 5 == 0 and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
-                self.joint_loss_fn.to_joints(pred_motions[randidx]),
-                self.joint_loss_fn.to_joints(gt_motions[randidx]),
+                self.joint_loss_fn.to_joints(
+                    pred_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                ),
+                self.joint_loss_fn.to_joints(
+                    gt_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                ),
             )
-            video_tensor = self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
-            self.logger.experiment.add_video( # type: ignore
+            video_tensor = self.render_motion(
+                pred_joints, gt_joints, "local_train_viz.mp4"
+            )
+            self.logger.experiment.add_video(  # type: ignore
                 "train_motion",
                 video_tensor,
                 global_step=self.current_epoch,
                 fps=40,
             )
-            
+
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
             self.log(
@@ -288,42 +313,51 @@ class SMORT(LightningModule):
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         # import pdb; pdb.set_trace()
-        if self.trainer.current_epoch % 5 == 0 and batch_idx == 0:
+        if (self.trainer.current_epoch + 1) % 5 == 0 and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
-                self.joint_loss_fn.to_joints(pred_motions[randidx]),
-                self.joint_loss_fn.to_joints(gt_motions[randidx]),
+                self.joint_loss_fn.to_joints(
+                    pred_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                ),
+                self.joint_loss_fn.to_joints(
+                    gt_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                ),
             )
-            video_tensor = self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
-            self.logger.experiment.add_video( # type: ignore
+            video_tensor = self.render_motion(
+                pred_joints, gt_joints, "local_val_viz.mp4"
+            )
+            self.logger.experiment.add_video(  # type: ignore
                 "val_motion",
                 video_tensor,
                 global_step=self.current_epoch,
                 fps=40,
             )
+
+            metrics = self.joint_loss_fn.evaluate_metrics(
+                pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
+            )
+            for metric_name in sorted(metrics):
+                metric_val = metrics[metric_name]
+                self.log(
+                    f"val_{metric_name}",
+                    metric_val,
+                    on_epoch=True,
+                    on_step=False,
+                    batch_size=bs,
+                )
         assert type(losses) is dict
         # if batch_idx == 0:
         #     random_idx = random.randint(0, bs - 1)
         #     # import pdb; pdb.set_trace()
         #     self.render_motion(joints[random_idx], gt_joints[random_idx], "local_val_viz.mp4")
 
-        # for metric_name in sorted(metrics):
-        #     loss_val = metrics[metric_name]
-        #     self.log(
-        #         f"val_{metric_name}",
-        #         loss_val,
-        #         on_epoch=True,
-        #         on_step=True,
-        #         batch_size=bs,
-        #     )
-
-        # for metric_name in sorted(losses):
-        #     loss_val = losses[metric_name]
-        #     self.log(
-        #         f"val_{metric_name}",
-        #         loss_val,
-        #         on_epoch=True,
-        #         on_step=True,
-        #         batch_size=bs,
-        #     )
+        for loss_name in sorted(losses):
+            loss_val = losses[loss_name]
+            self.log(
+                f"val_{loss_name}",
+                loss_val,
+                on_epoch=True,
+                on_step=False,
+                batch_size=bs,
+            )
         return losses["loss"]
