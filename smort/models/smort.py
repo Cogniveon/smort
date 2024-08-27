@@ -240,6 +240,23 @@ class SMORT(LightningModule):
         #     self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
         assert type(losses) is dict
 
+        self.log("lambda_recons", recons_lambda, on_epoch=True, on_step=False, batch_size=bs)
+        self.log("lambda_joint", joint_lambda, on_epoch=True, on_step=False, batch_size=bs)
+
+        if self.trainer.current_epoch % 5 == 0 and batch_idx == 0:
+            randidx = random.randint(0, bs - 1)
+            pred_joints, gt_joints = (
+                self.joint_loss_fn.to_joints(pred_motions[randidx]),
+                self.joint_loss_fn.to_joints(gt_motions[randidx]),
+            )
+            video_tensor = self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
+            self.logger.experiment.add_video( # type: ignore
+                "train_motion",
+                video_tensor,
+                global_step=self.current_epoch,
+                fps=40,
+            )
+            
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
             self.log(
@@ -257,24 +274,33 @@ class SMORT(LightningModule):
             assert self.logger is not None
             output = "viz.mp4"
 
-        self.renderer.render_animation(
+        frames = self.renderer.render_animation(
             gt.detach().cpu().numpy(),
             motion.detach().cpu().numpy(),
             output=output,
+            return_frames=True,
         )
+        video_tensor = torch.from_numpy(frames).permute(0, 3, 1, 2).unsqueeze(0)
+        return video_tensor
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         # import pdb; pdb.set_trace()
-        if batch_idx == 0:
+        if self.trainer.current_epoch % 5 == 0 and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 self.joint_loss_fn.to_joints(pred_motions[randidx]),
                 self.joint_loss_fn.to_joints(gt_motions[randidx]),
             )
-            self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
+            video_tensor = self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
+            self.logger.experiment.add_video( # type: ignore
+                "val_motion",
+                video_tensor,
+                global_step=self.current_epoch,
+                fps=40,
+            )
         assert type(losses) is dict
         # if batch_idx == 0:
         #     random_idx = random.randint(0, bs - 1)
