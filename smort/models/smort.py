@@ -49,7 +49,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-3},
+        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-4},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
@@ -244,12 +244,6 @@ class SMORT(LightningModule):
             ).detach().cpu().item(),
             'joint': cosine_annealing_lambda(
                 current_epoch % 100, 100, self.lmd["recons"], 2
-            ).detach().cpu().item(),
-            'latent': cosine_annealing_lambda(
-                current_epoch % 100, 100, self.lmd["latent"], 1
-            ).detach().cpu().item(),
-            'kl': cosine_annealing_lambda(
-                current_epoch % 100, 100, self.lmd["kl"], 2
             ).detach().cpu().item(),
         }
 
