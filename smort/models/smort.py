@@ -240,16 +240,16 @@ class SMORT(LightningModule):
         self.lmd = {
             **self.lmd,
             'recons': 1 - cosine_annealing_lambda(
-                current_epoch // 100, 100, self.lmd["recons"], 2
+                current_epoch % 100, 100, self.lmd["recons"], 2
             ).detach().cpu().item(),
             'joint': cosine_annealing_lambda(
-                current_epoch // 100, 100, self.lmd["recons"], 2
+                current_epoch % 100, 100, self.lmd["recons"], 2
             ).detach().cpu().item(),
             'latent': cosine_annealing_lambda(
-                current_epoch // 100, 100, self.lmd["latent"], 1
+                current_epoch % 100, 100, self.lmd["latent"], 1
             ).detach().cpu().item(),
             'kl': cosine_annealing_lambda(
-                current_epoch // 100, 100, self.lmd["kl"], 2
+                current_epoch % 100, 100, self.lmd["kl"], 2
             ).detach().cpu().item(),
         }
 
