@@ -219,8 +219,8 @@ class SingleMotionRenderer:
         ax.set_yticklabels([])
         ax.set_zticklabels([])
 
-        # ax.set_axis_off()
-        # ax.grid(b=False)
+        ax.set_axis_off()
+        ax.grid(b=False)
 
         ax.set_title(title, loc="center", wrap=True)
         return ax

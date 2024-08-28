@@ -20,23 +20,17 @@ from smort.renderer.matplotlib import SceneRenderer
 logger = logging.getLogger(__name__)
 
 
-def cosine_annealing_lambda(
-    epoch: int, num_epochs: int, initial_lambda: float
-) -> torch.Tensor:
+def cosine_annealing_lambda(epoch: int, num_epochs: int, initial_lambda: float, num_peaks: int) -> torch.Tensor:
     """
-    Returns a lambda value based on a cosine annealing schedule.
+    Returns a lambda value based on a generalized cosine annealing schedule for n peaks.
     :param epoch: Current epoch.
     :param num_epochs: Total number of epochs.
     :param initial_lambda: Initial value of lambda.
+    :param num_peaks: Number of peaks desired in the schedule.
     :return: Adjusted lambda value.
     """
-    return torch.abs(
-        (
-            initial_lambda
-            * 0.5
-            * (1 + torch.cos(torch.tensor(epoch * 3.14159265 / num_epochs)))
-        ) - 1
-    )
+    # Adjusted formula to create `num_peaks` peaks within `num_epochs`
+    return initial_lambda * 0.5 * (1 - torch.cos(torch.tensor(2 * num_peaks * epoch * 3.14159265 / num_epochs)))
 
 
 class SMORT(LightningModule):
@@ -55,7 +49,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-5},
+        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-3},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
@@ -116,7 +110,7 @@ class SMORT(LightningModule):
         optimizer = AdamW(lr=self.lr, params=self.parameters())
         return {
             "optimizer": optimizer,
-            "lr_scheduler": CosineAnnealingLR(optimizer, self.trainer.max_epochs or 100)
+            # "lr_scheduler": CosineAnnealingLR(optimizer, self.trainer.max_epochs or 100)
         }
 
     def forward(
@@ -244,33 +238,31 @@ class SMORT(LightningModule):
         current_epoch = self.trainer.current_epoch
         max_epochs = self.trainer.max_epochs or 100
 
-        joint_lambda = cosine_annealing_lambda(
-            current_epoch, max_epochs, self.lmd["joint"]
-        )
-
-        self.lmd["joint"] = joint_lambda
+        self.lmd = {
+            **self.lmd,
+            'joint': cosine_annealing_lambda(
+                current_epoch, max_epochs, self.lmd["joint"], 2
+            ).detach().cpu().item(),
+            'latent': cosine_annealing_lambda(
+                current_epoch, max_epochs, self.lmd["latent"], 1
+            ).detach().cpu().item(),
+            'kl': cosine_annealing_lambda(
+                current_epoch, max_epochs, self.lmd["kl"], 2
+            ).detach().cpu().item(),
+        }
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         assert type(losses) is dict
 
-        self.log(
-            "lambda_joint", joint_lambda, on_epoch=True, on_step=False, batch_size=bs
-        )
-
+        for k, v in self.lmd.items():
+            self.log(
+                f"lambda_{k}", v, on_epoch=True, on_step=False, batch_size=bs
+            )
+            
         if (
             (self.trainer.current_epoch) % 5 == 0
             or self.trainer.current_epoch + 1 == self.trainer.max_epochs
         ) and batch_idx == 0:
-            logger.info(
-                f"Epoch {current_epoch} - Lambda Joint: {joint_lambda}"
-            )
-
-            # Log the current epoch's losses
-            for loss_name, loss_val in losses.items():
-                logger.info(
-                    f"Epoch {current_epoch} - Batch {batch_idx} - Loss {loss_name}: {loss_val.item()}"
-                )
-
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 self.joint_loss_fn.to_joints(
@@ -292,8 +284,16 @@ class SMORT(LightningModule):
                 on_epoch=True,
                 on_step=True,
                 batch_size=bs,
-                prog_bar=loss_name == "loss" or loss_name == "joint",
+                prog_bar=loss_name == "loss",
             )
+        
+        if batch_idx == 0:
+            loss_dict = {k: v.item() for k, v in losses.items()}
+            lmd_dict = {k: v for k, v in self.lmd.items()}
+            logger.info(
+                f"Train Epoch {current_epoch} - Lambda dict: {lmd_dict} - Loss dict: {loss_dict}"
+            )
+        
         return losses["loss"]
 
     def render_motion(self, motion: torch.Tensor, gt: torch.Tensor, output=None):
