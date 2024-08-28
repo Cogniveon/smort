@@ -236,18 +236,20 @@ class SMORT(LightningModule):
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
         current_epoch = self.trainer.current_epoch
-        max_epochs = self.trainer.max_epochs or 100
 
         self.lmd = {
             **self.lmd,
+            'recons': 1 - cosine_annealing_lambda(
+                current_epoch, 100, self.lmd["recons"], 2
+            ).detach().cpu().item(),
             'joint': cosine_annealing_lambda(
-                current_epoch, max_epochs, self.lmd["joint"], 2
+                current_epoch, 100, self.lmd["recons"], 2
             ).detach().cpu().item(),
             'latent': cosine_annealing_lambda(
-                current_epoch, max_epochs, self.lmd["latent"], 1
+                current_epoch, 100, self.lmd["latent"], 1
             ).detach().cpu().item(),
             'kl': cosine_annealing_lambda(
-                current_epoch, max_epochs, self.lmd["kl"], 2
+                current_epoch, 100, self.lmd["kl"], 2
             ).detach().cpu().item(),
         }
 
