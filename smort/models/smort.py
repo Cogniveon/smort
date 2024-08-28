@@ -260,7 +260,7 @@ class SMORT(LightningModule):
             )
             
         if (
-            (self.trainer.current_epoch) % 5 == 0
+            (self.trainer.current_epoch) % 20 == 0
             or self.trainer.current_epoch + 1 == self.trainer.max_epochs
         ) and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
@@ -314,7 +314,7 @@ class SMORT(LightningModule):
 
         # import pdb; pdb.set_trace()
         if (
-            (self.trainer.current_epoch) % 5 == 0
+            (self.trainer.current_epoch) % 20 == 0
             or self.trainer.current_epoch + 1 == self.trainer.max_epochs
         ) and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
