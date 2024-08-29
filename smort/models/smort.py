@@ -204,8 +204,13 @@ class SMORT(LightningModule):
         )
         # fmt: on
 
-        losses["joint"] = self.joint_loss_fn.forward(
-            t_motions, ref_motions, batch["reactor_x_dict"]["mask"]
+        losses["joint"] = (
+            + self.joint_loss_fn.forward(
+                t_motions, ref_motions, batch["reactor_x_dict"]["mask"]
+            ) # text -> motion
+            + self.joint_loss_fn.forward(
+                m_motions, ref_motions, batch["reactor_x_dict"]["mask"]
+            ) # scene -> motion
         )
 
         # VAE losses
@@ -309,10 +314,7 @@ class SMORT(LightningModule):
         losses, pred_motions, gt_motions = self.compute_loss(batch)
 
         # import pdb; pdb.set_trace()
-        if (
-            (self.trainer.current_epoch) % 20 == 0
-            or self.trainer.current_epoch + 1 == self.trainer.max_epochs
-        ) and batch_idx == 0:
+        if batch_idx == 0:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 self.joint_loss_fn.to_joints(
