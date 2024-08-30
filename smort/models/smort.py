@@ -223,15 +223,12 @@ class SMORT(LightningModule):
             + self.reconstruction_loss_fn(s_motions, ref_motions) # scene -> motion
             + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
         )
-        # fmt: on
-
-        losses["joint"] = self.joint_loss_fn.forward(
-            t_motions, ref_motions, mask
-        ) + self.joint_loss_fn.forward(
-            s_motions, ref_motions, mask
-        ) + self.joint_loss_fn.forward(
-            m_motions, ref_motions, mask
+        losses["joint"] = (
+            + self.joint_loss_fn.forward(t_motions, ref_motions, mask)
+            + self.joint_loss_fn.forward(s_motions, ref_motions, mask)
+            + self.joint_loss_fn.forward(m_motions, ref_motions, mask)
         )
+        # fmt: on
 
         # VAE losses
         if self.vae:
