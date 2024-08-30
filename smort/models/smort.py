@@ -372,11 +372,19 @@ class SMORT(LightningModule):
             )
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
-                self.joint_loss_fn.to_joints(
-                    pred_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                feats_to_joints(
+                    self.joint_loss_fn.denorm(
+                        pred_motions[randidx][
+                            batch["reactor_x_dict"]["mask"][randidx], ...
+                        ]
+                    )
                 ),
-                self.joint_loss_fn.to_joints(
-                    gt_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                feats_to_joints(
+                    self.joint_loss_fn.denorm(
+                        gt_motions[randidx][
+                            batch["reactor_x_dict"]["mask"][randidx], ...
+                        ]
+                    )
                 ),
             )
             self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
