@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from smort.renderer.matplotlib import SceneRenderer
 from smort.rifke import feats_to_joints
 
 
@@ -32,23 +33,23 @@ class JointLoss(nn.Module):
         self.register_buffer("data_mean", data_mean)
         self.register_buffer("data_std", data_std)
 
-    def to_joints(self, motion: torch.Tensor) -> torch.Tensor:
+        self.renderer = SceneRenderer(
+            colors1=["red"] * 5,
+            colors2=["black"] * 5,
+        )
+
+    def denorm(self, motion: torch.Tensor) -> torch.Tensor:
         # import pdb; pdb.set_trace()
-        return feats_to_joints(
+        return (
             motion * self.data_std[: motion.shape[-2], :]
-            + self.data_mean[: motion.shape[-2], :],
+            + self.data_mean[: motion.shape[-2], :]
         )
 
     def get_root_position_loss(
         self, pred_joints: torch.Tensor, gt_joints: torch.Tensor
     ):
-        # Trajectory
         loss = F.mse_loss(
-            pred_joints[..., 0, [0, 1]], gt_joints[..., 0, [0, 1]], reduction="mean"
-        )
-        # height
-        loss += F.mse_loss(
-            pred_joints[..., 0, [2]], gt_joints[..., 0, [2]], reduction="mean"
+            pred_joints[..., 0, :], gt_joints[..., 0, :], reduction="mean"
         )
         return loss
 
@@ -57,7 +58,7 @@ class JointLoss(nn.Module):
         pred_joints: torch.Tensor,
         gt_joints: torch.Tensor,
         feet_indices: list = [7, 8, 10, 11],
-        ground_threshold=0.01,
+        ground_threshold=0.005,
     ):
         # Ensure that feet joints are close to the ground (y-coordinate close to 0)
         # For simplicity, we assume ground level is at y < 0.01
@@ -75,22 +76,37 @@ class JointLoss(nn.Module):
         return F.mse_loss(
             masked_pred_vel, torch.zeros_like(masked_pred_vel), reduction="mean"
         )
+    
+    def get_vel_loss(
+        self,
+        pred_joints: torch.Tensor,
+        gt_joints: torch.Tensor,
+    ):
+        return F.mse_loss(
+            pred_joints[1:, :, :] - pred_joints[:-1, :, :],
+            gt_joints[1:, :, :] - gt_joints[:-1, :, :],
+            reduction="mean",
+        )
+
+    def render_joints(self, j1: torch.Tensor, j2: torch.Tensor):
+        self.renderer.render_animation(
+            j1.detach().cpu().numpy(), j2.detach().cpu().numpy(), output="viz.mp4"
+        )
 
     def forward(self, motion: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):
         bs, _, nfeats = motion.shape
         loss = torch.tensor(0.0, dtype=torch.float32, device=motion.device)
-        # Select some important joints
-        joint_selection = [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 17, 18, 19, 20, 21, 15]
 
         for i in range(bs):
-            pred_joints = self.to_joints(motion[i][mask[i], ...])
-            gt_joints = self.to_joints(gt[i][mask[i], ...])
+            pred_joints = feats_to_joints(self.denorm(motion[i][mask[i], ...]))
+            gt_joints = feats_to_joints(self.denorm(gt[i][mask[i], ...]))
 
             loss += self.get_root_position_loss(pred_joints, gt_joints)
-            # loss += self.get_foot_contact_loss(pred_joints, gt_joints)
+            loss += self.get_vel_loss(pred_joints, gt_joints)
+            loss += self.get_foot_contact_loss(pred_joints, gt_joints)
             loss += F.mse_loss(
-                pred_joints[:, joint_selection, :],
-                gt_joints[:, joint_selection, :],
+                pred_joints,
+                gt_joints,
                 reduction="mean",
             )
 
@@ -139,8 +155,10 @@ class JointLoss(nn.Module):
         bs, _, _ = predicted_motion.shape
 
         for i in range(bs):
-            pred_joints = self.to_joints(predicted_motion[i][mask[i], ...])
-            gt_joints = self.to_joints(gt_motion[i][mask[i], ...])
+            pred_joints = feats_to_joints(
+                self.denorm(predicted_motion[i][mask[i], ...])
+            )
+            gt_joints = feats_to_joints(self.denorm(gt_motion[i][mask[i], ...]))
 
             metrics["mpjme"] += self.compute_mpjme(pred_joints, gt_joints)
             metrics["mrpe"] += self.compute_mrpe(pred_joints, gt_joints)

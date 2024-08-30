@@ -5,7 +5,6 @@ from typing import Dict, List, Literal, Optional
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
@@ -13,9 +12,9 @@ from smort.models.modules import (
     ACTORStyleDecoder,
     ACTORStyleEncoder,
     ACTORStyleEncoderWithCA,
-    SMORTEncoder,
 )
 from smort.renderer.matplotlib import SceneRenderer
+from smort.rifke import feats_to_joints
 
 
 logger = logging.getLogger(__name__)
@@ -34,10 +33,20 @@ def cosine_annealing_lambda(
     """
     # Adjusted formula to create `num_peaks` peaks within `num_epochs`
     return (
-        initial_lambda
-        * 0.5
-        * (1 - torch.cos(torch.tensor(2 * num_peaks * epoch * 3.14159265 / num_epochs)))
-    ).detach().cpu().item()
+        (
+            initial_lambda
+            * 0.5
+            * (
+                1
+                - torch.cos(
+                    torch.tensor(2 * num_peaks * epoch * 3.14159265 / num_epochs)
+                )
+            )
+        )
+        .detach()
+        .cpu()
+        .item()
+    )
 
 
 class SMORT(LightningModule):
@@ -261,9 +270,7 @@ class SMORT(LightningModule):
 
         self.lmd = {
             **self.lmd,
-            "joint": cosine_annealing_lambda(
-                current_epoch % 100, 100, 1.0, 2
-            ) * 1e-2,
+            "joint": cosine_annealing_lambda(current_epoch % 100, 100, 1.0, 2) * 1e-2,
         }
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
@@ -278,11 +285,19 @@ class SMORT(LightningModule):
         ) and batch_idx == 0:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
-                self.joint_loss_fn.to_joints(
-                    pred_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                feats_to_joints(
+                    self.joint_loss_fn.denorm(
+                        pred_motions[randidx][
+                            batch["reactor_x_dict"]["mask"][randidx], ...
+                        ]
+                    )
                 ),
-                self.joint_loss_fn.to_joints(
-                    gt_motions[randidx][batch["reactor_x_dict"]["mask"][randidx], ...]
+                feats_to_joints(
+                    self.joint_loss_fn.denorm(
+                        gt_motions[randidx][
+                            batch["reactor_x_dict"]["mask"][randidx], ...
+                        ]
+                    )
                 ),
             )
             self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
@@ -323,7 +338,7 @@ class SMORT(LightningModule):
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         assert type(losses) is dict
-        
+
         metrics = self.joint_loss_fn.evaluate_metrics(
             pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
         )
@@ -336,7 +351,7 @@ class SMORT(LightningModule):
                 on_step=True,
                 batch_size=bs,
             )
-        
+
         # Log the current epoch's losses
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
@@ -347,7 +362,6 @@ class SMORT(LightningModule):
                 on_step=False,
                 batch_size=bs,
             )
-
 
         # import pdb; pdb.set_trace()
         if batch_idx == 0:
