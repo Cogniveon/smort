@@ -56,7 +56,7 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joint": 1.0e-5, "latent": 1.0e-5, "kl": 1.0e-4},
+        lmd: Dict = {"recons": 1, "joint": 1, "latent": 1.0e-5, "kl": 1.0e-4},
         lr: float = 1e-4,
     ) -> None:
         super().__init__()
