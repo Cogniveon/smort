@@ -262,8 +262,8 @@ class SMORT(LightningModule):
         self.lmd = {
             **self.lmd,
             "joint": cosine_annealing_lambda(
-                current_epoch % 100, 100, self.lmd["recons"], 2
-            ),
+                current_epoch % 100, 100, self.lmd["recons"] - 1e-4, 2
+            ) + 1e-4,
         }
 
         losses, pred_motions, gt_motions = self.compute_loss(batch)
