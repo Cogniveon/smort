@@ -47,7 +47,7 @@ class SMORT(LightningModule):
         data_std: torch.Tensor,
         nmotionfeats: int = 76,
         ntextfeats: int = 768,
-        latent_dim: int = 512,
+        latent_dim: int = 256,
         ff_size: int = 1024,
         num_layers: int = 8,
         num_heads: int = 8,
@@ -67,7 +67,7 @@ class SMORT(LightningModule):
         self.fact = fact if fact is not None else 1.0
         self.sample_mean = sample_mean
 
-        self.motion_encoder = SMORTEncoder(
+        self.motion_encoder = ACTORStyleEncoder(
             nfeats=nmotionfeats,
             vae=vae,
             latent_dim=latent_dim,
@@ -77,7 +77,7 @@ class SMORT(LightningModule):
             dropout=dropout,
             activation=activation,
         )
-        self.scene_encoder = SMORTEncoder(
+        self.scene_encoder = ACTORStyleEncoder(
             nfeats=nmotionfeats * 2,
             vae=vae,
             latent_dim=latent_dim,
@@ -86,10 +86,8 @@ class SMORT(LightningModule):
             num_heads=num_heads,
             dropout=dropout,
             activation=activation,
-            n_contextfeats=nmotionfeats,
-            use_cross_attn=True,
         )
-        self.text_encoder = SMORTEncoder(
+        self.text_encoder = ACTORStyleEncoder(
             nfeats=ntextfeats,
             vae=vae,
             latent_dim=latent_dim,
@@ -152,7 +150,7 @@ class SMORT(LightningModule):
         else:
             encoder = self.motion_encoder
 
-        if encoder.use_cross_attn:
+        if isinstance(encoder, ACTORStyleEncoderWithCA):
             assert context is not None
             encoded = encoder(inputs, context)
         else:
@@ -201,13 +199,12 @@ class SMORT(LightningModule):
         s_motions, s_latents, s_dists = self(
             batch["scene_x_dict"],
             "scene",
-            context=batch["actor_x_dict"],
             mask=mask,
             return_all=True,
         )
-        # motion -> motion
+        # actor -> motion
         m_motions, m_latents, m_dists = self(
-            batch["reactor_x_dict"],
+            batch["actor_x_dict"],
             "motion",
             mask=mask,
             return_all=True,
