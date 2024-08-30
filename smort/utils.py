@@ -1,5 +1,6 @@
 import math
 import os
+import random
 from typing import Literal, Optional
 
 import numpy as np
@@ -56,7 +57,7 @@ def compute_joints(
     )
     transformed_joints = torch.matmul(output.joints, transform_matrix)
 
-    return transformed_joints[:, : smplx_model.NUM_JOINTS, :]
+    return transformed_joints[:, : smplx_model.NUM_BODY_JOINTS + 3, :]
 
 
 def loop_interx(
@@ -71,7 +72,9 @@ def loop_interx(
     if include_only == "all":
         motions = os.listdir(f"{base_dir}/motions")
     elif type(include_only) == int:
-        motions = os.listdir(f"{base_dir}/motions")[:include_only]
+        motions = os.listdir(f"{base_dir}/motions")
+        random.shuffle(motions)
+        motions = motions[:include_only]
     elif type(include_only) == ListConfig:
         motions = [
             x

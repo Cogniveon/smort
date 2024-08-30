@@ -24,6 +24,7 @@ def compute_feats(cfg: DictConfig):
     device = torch.device(cfg.device)
     include_only = cfg.include_only
     fps = cfg.fps
+    nfeats = cfg.nfeats
     min_seconds = cfg.min_seconds
     max_seconds = cfg.max_seconds
 
@@ -44,7 +45,7 @@ def compute_feats(cfg: DictConfig):
     )
     dataset = h5py.File(dataset_file, "w")
     motions_df = None
-    mean_std = MeanStdMetric(166, math.floor(max_seconds * fps)).to(device)
+    mean_std = MeanStdMetric(nfeats, math.floor(max_seconds * fps)).to(device)
 
     motions_dataset = dataset.create_group("motions")
     texts_dataset = dataset.create_group("texts")
@@ -74,7 +75,7 @@ def compute_feats(cfg: DictConfig):
             )
 
             translation = j1[..., 0, :].clone()
-            forward = get_forward_direction(j1, jointstype="smplxjoints")
+            forward = get_forward_direction(j1, jointstype="smpljoints")
             angles = torch.atan2(*(forward.transpose(0, -1))).transpose(0, -1)
 
             reactor_feats = joints_to_feats(j1, translation, angles)
@@ -90,7 +91,7 @@ def compute_feats(cfg: DictConfig):
                 ]
             )
             assert (
-                scene_motions.shape[-1] == 166
+                scene_motions.shape[-1] == nfeats
             ), f"Invalid feats shape({scene_id}): {scene_motions.shape}"
 
             # Update mean and standard deviation metrics

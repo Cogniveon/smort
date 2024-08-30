@@ -16,6 +16,7 @@ text_encoder:
 fps: 20.0
 min_seconds: 2.0
 max_seconds: 30.0
+nfeats: 76
 # include_only: all
 include_only: 100
 # include_only:

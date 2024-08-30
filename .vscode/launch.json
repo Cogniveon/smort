@@ -11,7 +11,7 @@
             "program": "train.py",
             "args": [
                 "data.batch_size=2",
-                "data.dataset_file=deps/interx/processed/dataset_2k.h5",
+                "data.dataset_file=deps/interx/processed/dataset.h5",
                 "data.use_tiny=0.05",
                 "trainer.accelerator=cpu",
                 "trainer.max_epochs=500",

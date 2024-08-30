@@ -239,7 +239,7 @@ def ungroup(features: Tensor) -> tuple[Tensor, Tensor, Tensor, Tensor]:
     return root_grav_axis, poses_features, vel_angles, vel_trajectory_local
 
 
-def get_forward_direction(poses, jointstype="smplxjoints"):
+def get_forward_direction(poses, jointstype="smpljoints"):
     assert jointstype in INFOS
     infos = INFOS[jointstype]
     assert poses.shape[-2] == infos["njoints"], f"Invalid poses shape {poses.shape=}"
