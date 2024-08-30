@@ -17,7 +17,7 @@ class TextMotionDataset(Dataset):
         normalize: bool = True,
         eps: float = 1e-12,
         device: torch.device = torch.device("cpu"),
-        use_tiny: bool | float = False,
+        use_tiny: float = 1.0,
         return_scene: bool = False,
     ):
         self.collate_fn = collate_text_motion
@@ -25,7 +25,7 @@ class TextMotionDataset(Dataset):
         self.motion_only = motion_only
         self.return_scene = return_scene
         self.normalize = normalize
-        self.use_tiny = use_tiny if type(use_tiny) == float else 0.1
+        self.use_tiny = use_tiny
         self.eps = eps
         self.device = device
 

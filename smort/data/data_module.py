@@ -15,7 +15,7 @@ class InterXDataModule(pl.LightningDataModule):
         dataset_file: str,
         batch_size=32,
         num_workers=os.cpu_count(),
-        use_tiny: bool | float = False,
+        use_tiny: float = 1.0,
         return_scene: bool = False,
     ) -> None:
         super().__init__()
