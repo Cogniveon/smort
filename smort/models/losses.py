@@ -110,7 +110,7 @@ class JointLoss(nn.Module):
                 reduction="mean",
             )
 
-        return loss / bs
+        return loss
 
     def compute_mpjme(
         self,
