@@ -19,35 +19,6 @@ from smort.rifke import feats_to_joints
 logger = logging.getLogger(__name__)
 
 
-def cosine_annealing_lambda(
-    epoch: int, num_epochs: int, initial_lambda: float, num_peaks: int
-) -> float:
-    """
-    Returns a lambda value based on a generalized cosine annealing schedule for n peaks.
-    :param epoch: Current epoch.
-    :param num_epochs: Total number of epochs.
-    :param initial_lambda: Initial value of lambda.
-    :param num_peaks: Number of peaks desired in the schedule.
-    :return: Adjusted lambda value.
-    """
-    # Adjusted formula to create `num_peaks` peaks within `num_epochs`
-    return (
-        (
-            initial_lambda
-            * 0.5
-            * (
-                1
-                - torch.cos(
-                    torch.tensor(2 * num_peaks * epoch * 3.14159265 / num_epochs)
-                )
-            )
-        )
-        .detach()
-        .cpu()
-        .item()
-    )
-
-
 class SMORT(LightningModule):
     def __init__(
         self,
@@ -384,3 +355,33 @@ class SMORT(LightningModule):
             self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
 
         return losses["loss"]
+
+
+
+def cosine_annealing_lambda(
+    epoch: int, num_epochs: int, initial_lambda: float, num_peaks: int
+) -> float:
+    """
+    Returns a lambda value based on a generalized cosine annealing schedule for n peaks.
+    :param epoch: Current epoch.
+    :param num_epochs: Total number of epochs.
+    :param initial_lambda: Initial value of lambda.
+    :param num_peaks: Number of peaks desired in the schedule.
+    :return: Adjusted lambda value.
+    """
+    # Adjusted formula to create `num_peaks` peaks within `num_epochs`
+    return (
+        (
+            initial_lambda
+            * 0.5
+            * (
+                1
+                - torch.cos(
+                    torch.tensor(2 * num_peaks * epoch * 3.14159265 / num_epochs)
+                )
+            )
+        )
+        .detach()
+        .cpu()
+        .item()
+    )
