@@ -39,12 +39,12 @@ class TextMotionDataset(Dataset):
             else:
                 return num_scenes
 
-    def __getitem__(self, index):
+    def get_scene(self, scene_id: str | int):
         with h5py.File(self.dataset_path, "r") as f:
             motions_dataset = f["motions"]
             assert type(motions_dataset) is h5py.Group
-            scene_id = list(motions_dataset.keys())[index]
-
+            if type(scene_id) == int:
+                scene_id = list(motions_dataset.keys())[scene_id]
             scene_dataset = motions_dataset[f"{scene_id}"]
             assert type(scene_dataset) is h5py.Dataset
 
@@ -106,6 +106,9 @@ class TextMotionDataset(Dataset):
                 # del ret_dict['actor_x_dict']
             return ret_dict
 
+    def __getitem__(self, index):
+        return self.get_scene(index)
+
     def get_mean_std(
         self, return_tensors: bool = True
     ) -> tuple[torch.Tensor, torch.Tensor] | tuple[np.ndarray, np.ndarray]:
@@ -117,7 +120,7 @@ class TextMotionDataset(Dataset):
             assert type(mean) == np.ndarray and type(std) == np.ndarray
             return mean, std + self.eps
 
-    def reverse_norm(self, motion: np.ndarray | torch.Tensor):
+    def reverse_norm(self, motion: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
         if type(motion) is torch.Tensor:
             motion = motion.detach().cpu().numpy()
         assert type(motion) == np.ndarray

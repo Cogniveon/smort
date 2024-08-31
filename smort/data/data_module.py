@@ -63,3 +63,6 @@ class InterXDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             persistent_workers=True,
         )
+
+    def get_scene(self, scene_id: str | int):
+        return self.dataset.get_scene(scene_id)

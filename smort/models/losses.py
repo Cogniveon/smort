@@ -33,10 +33,7 @@ class JointLoss(nn.Module):
         self.register_buffer("data_mean", data_mean)
         self.register_buffer("data_std", data_std)
 
-        self.renderer = SceneRenderer(
-            colors1=["red"] * 5,
-            colors2=["black"] * 5,
-        )
+        self.renderer = SceneRenderer()
 
     def denorm(self, motion: torch.Tensor) -> torch.Tensor:
         # import pdb; pdb.set_trace()
@@ -90,7 +87,7 @@ class JointLoss(nn.Module):
 
     def render_joints(self, j1: torch.Tensor, j2: torch.Tensor):
         self.renderer.render_animation(
-            j1.detach().cpu().numpy(), j2.detach().cpu().numpy(), output="viz.mp4"
+            [j1, j2], output="viz.mp4"
         )
 
     def forward(self, motion: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor):

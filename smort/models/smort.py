@@ -323,8 +323,7 @@ class SMORT(LightningModule):
             output = "viz.mp4"
 
         self.renderer.render_animation(
-            gt.detach().cpu().numpy(),
-            motion.detach().cpu().numpy(),
+            [gt, motion],
             output=output,
         )
 

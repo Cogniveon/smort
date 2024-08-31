@@ -252,7 +252,7 @@ def get_forward_direction(poses, jointstype="smpljoints"):
     return forward
 
 
-def canonicalize_rotation(joints, jointstype="smplxjoints"):
+def canonicalize_rotation(joints: torch.Tensor | np.ndarray, jointstype="smplxjoints"):
     return_np = False
     if isinstance(joints, np.ndarray):
         joints = torch.from_numpy(joints)

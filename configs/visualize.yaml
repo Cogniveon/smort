@@ -1,0 +1,15 @@
+defaults:
+  - data: interx
+  - model: smort
+  - defaults
+  - trainer
+  - _self_
+
+
+seed: 42
+run_dir: outputs/${hydra:runtime.choices.model}_${hydra:runtime.choices.data}
+ckpt: deps/latest-epoch=299-v1.ckpt
+infer_type: actor
+# infer_type: text
+input: 0
+# input: G001T000A000R000
