@@ -37,6 +37,7 @@ class SMORT(LightningModule):
         sample_mean: Optional[bool] = False,
         lmd: Dict = {"recons": 1, "joint": 1.0e-3, "latent": 1.0e-5, "kl": 1.0e-4},
         lr: float = 1e-4,
+        should_visualize: bool = False,
     ) -> None:
         super().__init__()
         self.save_hyperparameters(ignore=["dataset"])
@@ -100,6 +101,7 @@ class SMORT(LightningModule):
         self.lr = lr
 
         self.renderer = SceneRenderer()
+        self.should_visualize = should_visualize
 
     def configure_optimizers(self):
         optimizer = AdamW(lr=self.lr, params=self.parameters())
@@ -248,7 +250,7 @@ class SMORT(LightningModule):
         if (
             (self.trainer.current_epoch) % 20 == 0
             or self.trainer.current_epoch + 1 == self.trainer.max_epochs
-        ) and batch_idx == 0:
+        ) and batch_idx == 0 and self.should_visualize:
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 feats_to_joints(
@@ -335,24 +337,25 @@ class SMORT(LightningModule):
             logger.info(
                 f"Val Epoch {self.trainer.current_epoch} - Metrics dict: {metrics_dict} - Loss dict: {loss_dict}"
             )
-            randidx = random.randint(0, bs - 1)
-            pred_joints, gt_joints = (
-                feats_to_joints(
-                    self.joint_loss_fn.denorm(
-                        pred_motions[randidx][
-                            batch["reactor_x_dict"]["mask"][randidx], ...
-                        ]
-                    )
-                ),
-                feats_to_joints(
-                    self.joint_loss_fn.denorm(
-                        gt_motions[randidx][
-                            batch["reactor_x_dict"]["mask"][randidx], ...
-                        ]
-                    )
-                ),
-            )
-            self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
+            if self.should_visualize:
+                randidx = random.randint(0, bs - 1)
+                pred_joints, gt_joints = (
+                    feats_to_joints(
+                        self.joint_loss_fn.denorm(
+                            pred_motions[randidx][
+                                batch["reactor_x_dict"]["mask"][randidx], ...
+                            ]
+                        )
+                    ),
+                    feats_to_joints(
+                        self.joint_loss_fn.denorm(
+                            gt_motions[randidx][
+                                batch["reactor_x_dict"]["mask"][randidx], ...
+                            ]
+                        )
+                    ),
+                )
+                self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
 
         return losses["loss"]
 
