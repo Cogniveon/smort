@@ -8,13 +8,9 @@ from torch.optim.adamw import AdamW
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
-from smort.models.modules import (
-    ACTORStyleDecoder,
-    ACTORStyleEncoder
-)
+from smort.models.modules import ACTORStyleDecoder, ACTORStyleEncoder
 from smort.renderer.matplotlib import SceneRenderer
 from smort.rifke import feats_to_joints
-
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +33,7 @@ class SMORT(LightningModule):
         sample_mean: Optional[bool] = False,
         lmd: Dict = {"recons": 1, "joint": 1.0e-3, "latent": 1.0e-5, "kl": 1.0e-4},
         lr: float = 1e-4,
-        should_visualize: bool = False,
+        viz_interval: int = -1,
     ) -> None:
         super().__init__()
         self.save_hyperparameters(ignore=["dataset"])
@@ -101,7 +97,7 @@ class SMORT(LightningModule):
         self.lr = lr
 
         self.renderer = SceneRenderer()
-        self.should_visualize = should_visualize
+        self.viz_interval = viz_interval
 
     def configure_optimizers(self):
         optimizer = AdamW(lr=self.lr, params=self.parameters())
@@ -215,15 +211,12 @@ class SMORT(LightningModule):
             losses["kl"] = (
                 +self.kl_loss_fn(t_dists, ref_dists)  # text
                 + self.kl_loss_fn(s_dists, ref_dists)  # scene
-                + self.kl_loss_fn(m_dists, ref_dists)  # motion
-                + self.kl_loss_fn(ref_dists, m_dists)
                 + self.kl_loss_fn(ref_dists, s_dists)
                 + self.kl_loss_fn(ref_dists, t_dists)
             )
 
         # Latent manifold loss
-        losses["latent_t"] = self.latent_loss_fn(t_latents, s_latents)
-        losses["latent_s"] = self.latent_loss_fn(m_latents, s_latents)
+        losses["latent"] = self.latent_loss_fn(m_latents, s_latents)
 
         # Weighted average of the losses
         losses["loss"] = sum(
@@ -248,9 +241,13 @@ class SMORT(LightningModule):
             self.log(f"lambda_{k}", v, on_epoch=True, on_step=False, batch_size=bs)
 
         if (
-            (self.trainer.current_epoch) % 20 == 0
-            or self.trainer.current_epoch + 1 == self.trainer.max_epochs
-        ) and batch_idx == 0 and self.should_visualize:
+            self.viz_interval != -1
+            and (
+                (self.trainer.current_epoch) % self.viz_interval == 0
+                or self.trainer.current_epoch + 1 == self.trainer.max_epochs
+            )
+            and batch_idx == 0
+        ):
             randidx = random.randint(0, bs - 1)
             pred_joints, gt_joints = (
                 feats_to_joints(
@@ -285,7 +282,7 @@ class SMORT(LightningModule):
             loss_dict = {k: v.item() for k, v in losses.items()}
             lmd_dict = {k: v for k, v in self.lmd.items()}
             logger.info(
-                f"Train Epoch {current_epoch} - Lambda dict: {lmd_dict} - Loss dict: {loss_dict}"
+                f"Train Epoch {current_epoch} - Loss dict: {loss_dict} - Lambda dict: {lmd_dict}"
             )
 
         return losses["loss"]
@@ -337,7 +334,10 @@ class SMORT(LightningModule):
             logger.info(
                 f"Val Epoch {self.trainer.current_epoch} - Metrics dict: {metrics_dict} - Loss dict: {loss_dict}"
             )
-            if self.should_visualize:
+            if (
+                self.viz_interval != -1
+                and self.trainer.current_epoch % self.viz_interval == 0
+            ):
                 randidx = random.randint(0, bs - 1)
                 pred_joints, gt_joints = (
                     feats_to_joints(
@@ -358,7 +358,6 @@ class SMORT(LightningModule):
                 self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
 
         return losses["loss"]
-
 
 
 def cosine_annealing_lambda(

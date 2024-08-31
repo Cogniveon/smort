@@ -1,11 +1,13 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Iterable, Optional, Tuple, List
+from typing import Iterable, List, Optional, Tuple
+
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.animation import FuncAnimation
 import torch
+from matplotlib.animation import FuncAnimation
+
 from smort.rifke import canonicalize_rotation
 
 logger = logging.getLogger("matplotlib.animation")
@@ -35,6 +37,7 @@ KINEMATIC_TREES = {
     ],
 }
 
+
 @dataclass
 class SceneRenderer:
     jointstype: str = "smplxjoints"
@@ -45,7 +48,7 @@ class SceneRenderer:
             ("red", "red", "red", "red", "red"),
             ("blue", "blue", "blue", "blue", "blue"),
             ("magenta", "magenta", "magenta", "magenta", "magenta"),
-            ("black", "black", "black", "black", "black")
+            ("black", "black", "black", "black", "black"),
         ]
     )
     figsize: Tuple[int, int] = (4, 4)
@@ -63,6 +66,7 @@ class SceneRenderer:
     ):
         if agg:
             import matplotlib
+
             matplotlib.use("Agg")
 
         jointstype = jointstype if jointstype is not None else self.jointstype
@@ -77,7 +81,10 @@ class SceneRenderer:
                 joints = joints.detach().cpu().numpy()
             joints_list.append(joints)
         if self.canonicalize:
-            joints_list = [canonicalize_rotation(joints, jointstype=jointstype) for joints in joints_list]
+            joints_list = [
+                canonicalize_rotation(joints, jointstype=jointstype)
+                for joints in joints_list
+            ]
 
         fig = plt.figure(figsize=self.figsize)
         ax = self.init_axis(fig, title)
@@ -88,7 +95,9 @@ class SceneRenderer:
         )
         draw_offset = int(25 / avg_segment_length)
 
-        spline_lines = [ax.plot(*trajectory.T, zorder=10)[0] for trajectory in trajectories]
+        spline_lines = [
+            ax.plot(*trajectory.T, zorder=10)[0] for trajectory in trajectories
+        ]
 
         all_joints = np.concatenate(joints_list, axis=1)
         minx, miny, _ = np.min(all_joints, axis=(0, 1))
@@ -105,17 +114,25 @@ class SceneRenderer:
         def update(frame):
             nonlocal initialized
 
-            for idx, (joints, lines, colors) in enumerate(zip(joints_list, lines_list, self.colors)):
+            for idx, (joints, lines, colors) in enumerate(
+                zip(joints_list, lines_list, self.colors)
+            ):
                 skeleton = joints[frame]
 
                 root = skeleton[0]
                 self.update_camera(ax, root)
 
                 hcolors = colors
-                if highlights_list and highlights_list[idx] is not None and highlights_list[idx][frame]:
+                if (
+                    highlights_list
+                    and highlights_list[idx] is not None
+                    and highlights_list[idx][frame]
+                ):
                     hcolors = ["yellow"] * 5
 
-                for i, (chain, color) in enumerate(zip(reversed(kinematic_tree), reversed(list(hcolors)))):
+                for i, (chain, color) in enumerate(
+                    zip(reversed(kinematic_tree), reversed(list(hcolors)))
+                ):
                     if not initialized:
                         lines.append(
                             ax.plot(
@@ -139,16 +156,21 @@ class SceneRenderer:
 
                 spline_lines[idx].set_xdata(trajectories[idx][left:right, 0])
                 spline_lines[idx].set_ydata(trajectories[idx][left:right, 1])
-                spline_lines[idx].set_3d_properties(np.zeros_like(trajectories[idx][left:right, 0]))
+                spline_lines[idx].set_3d_properties(
+                    np.zeros_like(trajectories[idx][left:right, 0])
+                )
 
             initialized = True
             return []
 
         frames = min(joints.shape[0] for joints in joints_list)
-        anim = FuncAnimation(fig, update, frames=frames, interval=1000 / self.fps, repeat=False)
+        anim = FuncAnimation(
+            fig, update, frames=frames, interval=1000 / self.fps, repeat=False
+        )
 
         if output == "notebook":
             from IPython.display import HTML, display
+
             display(HTML(anim.to_jshtml()))
         else:
             anim.save(output, fps=int(self.fps))

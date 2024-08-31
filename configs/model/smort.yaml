@@ -19,4 +19,5 @@ lmd:
     latent: 1.0e-5
     kl: 1.0e-4
 lr: 1e-4
-should_visualize: false
+# viz_interval: -1
+viz_interval: 50

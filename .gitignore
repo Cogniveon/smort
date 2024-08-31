@@ -5,6 +5,7 @@ logs
 lightning_logs
 local_*
 wandb
+artifacts
 
 # Created by https://www.toptal.com/developers/gitignore/api/windows,macos,linux,python,latex
 # Edit at https://www.toptal.com/developers/gitignore?templates=windows,macos,linux,python,latex

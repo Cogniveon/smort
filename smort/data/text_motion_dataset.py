@@ -120,7 +120,9 @@ class TextMotionDataset(Dataset):
             assert type(mean) == np.ndarray and type(std) == np.ndarray
             return mean, std + self.eps
 
-    def reverse_norm(self, motion: np.ndarray | torch.Tensor) -> np.ndarray | torch.Tensor:
+    def reverse_norm(
+        self, motion: np.ndarray | torch.Tensor
+    ) -> np.ndarray | torch.Tensor:
         if type(motion) is torch.Tensor:
             motion = motion.detach().cpu().numpy()
         assert type(motion) == np.ndarray
