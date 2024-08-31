@@ -25,6 +25,6 @@ trainer:
     # - _target_: smort.tqdm_logging.TQDMProgressBar
 
   logger:
-    _target_: pytorch_lightning.loggers.TensorBoardLogger
-    save_dir: ${run_dir}
-    name: logs
+    _target_: pytorch_lightning.loggers.WandbLogger
+    log_model: true
+    project: smort
