@@ -40,10 +40,11 @@ class InterXDataModule(pl.LightningDataModule):
 
         total_scenes = len(self.dataset)
         train_len = math.floor(total_scenes * 0.8)
-        val_test_len = (total_scenes - train_len) // 2
+        val_len = (total_scenes - train_len) // 2
+        test_len = total_scenes - (train_len + val_len)
 
         self.train, self.val, self.test = random_split(
-            self.dataset, [train_len, val_test_len, val_test_len]
+            self.dataset, [train_len, val_len, test_len]
         )
 
     def train_dataloader(self):
