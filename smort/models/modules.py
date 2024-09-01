@@ -110,7 +110,9 @@ class ACTORStyleDecoder(nn.Module):
         
         self.context_proj = nn.Sequential(
             nn.Linear(nfeats, latent_dim // 2),
+            nn.GELU(),
             nn.Linear(latent_dim // 2, latent_dim // 2),
+            nn.GELU(),
             nn.Linear(latent_dim // 2, latent_dim),
         )
         
