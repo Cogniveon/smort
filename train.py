@@ -33,6 +33,7 @@ def train(cfg: DictConfig):
     logger.info("Training")
     trainer: pl.Trainer = instantiate(cfg.trainer)
     trainer.fit(model, data_module)
+    trainer.test(model, data_module)
     logger.info("Training done.")
 
 

@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "train.py",
             "args": [
-                "data.batch_size=2",
+                "data.batch_size=1",
                 "data.dataset_file=deps/interx/processed/dataset.h5",
                 "data.use_tiny=0.05",
                 "trainer.accelerator=cpu",

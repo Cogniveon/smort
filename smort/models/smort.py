@@ -31,12 +31,12 @@ class SMORT(LightningModule):
         vae: bool = True,
         fact: Optional[float] = None,
         sample_mean: Optional[bool] = False,
-        lmd: Dict = {"recons": 1, "joint": 1.0e-3, "latent": 1.0e-5, "kl": 1.0e-4},
+        lmd: Dict = {"recons": 1, "joint": 1.0e-2, "latent": 1.0e-5, "kl": 1.0e-4},
         lr: float = 1e-4,
         viz_interval: int = -1,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters(ignore=["dataset"])
+        self.save_hyperparameters(ignore=["data_mean", "data_std"])
 
         # sampling parameters
         self.vae = vae
@@ -110,7 +110,7 @@ class SMORT(LightningModule):
         self,
         inputs: Dict,
         input_type: Literal["motion", "scene", "text"],
-        context: Optional[Dict] = None,
+        context: Dict,
         lengths: Optional[List[int]] = None,
         mask: Optional[torch.Tensor] = None,
         sample_mean: Optional[bool] = None,
@@ -147,7 +147,7 @@ class SMORT(LightningModule):
         # import pdb; pdb.set_trace()
         mask = mask if mask is not None else length_to_mask(lengths, device=self.device)
         z_dict = {"z": latent_vectors, "mask": mask}
-        motions = self.motion_decoder(z_dict)
+        motions = self.motion_decoder(z_dict, context)
 
         if return_all:
             return motions, latent_vectors, dists
@@ -166,6 +166,7 @@ class SMORT(LightningModule):
             batch["scene_x_dict"],
             "scene",
             mask=mask,
+            context=batch["actor_x_dict"],
             return_all=True,
         )
         # text -> motion
@@ -173,13 +174,15 @@ class SMORT(LightningModule):
             batch["text_x_dict"],
             "text",
             mask=mask,
+            context=batch["actor_x_dict"],
             return_all=True,
         )
-        # actor -> motion
+        # motion -> motion
         m_motions, m_latents, m_dists = self(
-            batch["actor_x_dict"],
+            batch["reactor_x_dict"],
             "motion",
             mask=mask,
+            context=batch["actor_x_dict"],
             return_all=True,
         )
 
@@ -191,7 +194,7 @@ class SMORT(LightningModule):
         losses["recons"] = (
             + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
             + self.reconstruction_loss_fn(s_motions, ref_motions) # scene -> motion
-            + self.reconstruction_loss_fn(m_motions, ref_motions) # actor -> motion
+            + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
         )
         losses["joint"] = (
             + self.joint_loss_fn.forward(t_motions, ref_motions, mask)
@@ -216,7 +219,8 @@ class SMORT(LightningModule):
             )
 
         # Latent manifold loss
-        losses["latent"] = self.latent_loss_fn(m_latents, s_latents)
+        losses["latent_s"] = self.latent_loss_fn(s_latents, m_latents)
+        losses["latent_t"] = self.latent_loss_fn(t_latents, m_latents)
 
         # Weighted average of the losses
         losses["loss"] = sum(
@@ -225,9 +229,30 @@ class SMORT(LightningModule):
 
         return losses, m_motions, ref_motions
 
+    def viz_random_from_batch(
+        self,
+        motion: torch.Tensor,
+        gt: torch.Tensor,
+        mask: torch.Tensor,
+        output: str = "viz.mp4",
+    ):
+        bs = motion.shape[0]
+        randidx = random.randint(0, bs - 1)
+
+        pred_joints, gt_joints = (
+            feats_to_joints(
+                self.joint_loss_fn.denorm(motion[randidx][mask[randidx], ...])
+            ),
+            feats_to_joints(self.joint_loss_fn.denorm(gt[randidx][mask[randidx], ...])),
+        )
+
+        self.renderer.render_animation(
+            [pred_joints, gt_joints],
+            output=output,
+        )
+
     def training_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
-        current_epoch = self.trainer.current_epoch
 
         # self.lmd = {
         #     **self.lmd,
@@ -237,35 +262,9 @@ class SMORT(LightningModule):
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         assert type(losses) is dict
 
-        for k, v in self.lmd.items():
-            self.log(f"lambda_{k}", v, on_epoch=True, on_step=False, batch_size=bs)
-
-        if (
-            self.viz_interval != -1
-            and (
-                (self.trainer.current_epoch) % self.viz_interval == 0
-                or self.trainer.current_epoch + 1 == self.trainer.max_epochs
-            )
-            and batch_idx == 0
-        ):
-            randidx = random.randint(0, bs - 1)
-            pred_joints, gt_joints = (
-                feats_to_joints(
-                    self.joint_loss_fn.denorm(
-                        pred_motions[randidx][
-                            batch["reactor_x_dict"]["mask"][randidx], ...
-                        ]
-                    )
-                ),
-                feats_to_joints(
-                    self.joint_loss_fn.denorm(
-                        gt_motions[randidx][
-                            batch["reactor_x_dict"]["mask"][randidx], ...
-                        ]
-                    )
-                ),
-            )
-            self.render_motion(pred_joints, gt_joints, "local_train_viz.mp4")
+        metrics = self.joint_loss_fn.evaluate_metrics(
+            pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
+        )
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
@@ -277,25 +276,39 @@ class SMORT(LightningModule):
                 batch_size=bs,
                 prog_bar=loss_name == "loss",
             )
+        for metric_name in sorted(metrics):
+            metric_val = metrics[metric_name]
+            self.log(
+                f"train_{metric_name}",
+                metric_val,
+                on_epoch=True,
+                on_step=True,
+                batch_size=bs,
+            )
+
+        if (
+            self.viz_interval != -1
+            and (
+                (self.trainer.current_epoch) % self.viz_interval == 0
+                or self.trainer.current_epoch + 1 == self.trainer.max_epochs
+            )
+            and batch_idx == 0
+        ):
+            self.viz_random_from_batch(
+                pred_motions,
+                gt_motions,
+                batch["reactor_x_dict"]["mask"],
+                output="local_train_viz.mp4",
+            )
 
         if batch_idx == 0:
             loss_dict = {k: v.item() for k, v in losses.items()}
-            lmd_dict = {k: v for k, v in self.lmd.items()}
+            metrics_dict = {k: v.item() for k, v in metrics.items()}
             logger.info(
-                f"Train Epoch {current_epoch} - Loss dict: {loss_dict} - Lambda dict: {lmd_dict}"
+                f"Train Epoch {self.trainer.current_epoch} - Loss dict: {loss_dict} - Metrics dict: {metrics_dict}"
             )
 
         return losses["loss"]
-
-    def render_motion(self, motion: torch.Tensor, gt: torch.Tensor, output=None):
-        if output is None:
-            assert self.logger is not None
-            output = "viz.mp4"
-
-        self.renderer.render_animation(
-            [gt, motion],
-            output=output,
-        )
 
     def validation_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
         bs = len(batch["reactor_x_dict"]["x"])
@@ -306,6 +319,16 @@ class SMORT(LightningModule):
         metrics = self.joint_loss_fn.evaluate_metrics(
             pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
         )
+
+        for loss_name in sorted(losses):
+            loss_val = losses[loss_name]
+            self.log(
+                f"val_{loss_name}",
+                loss_val,
+                on_epoch=True,
+                on_step=False,
+                batch_size=bs,
+            )
         for metric_name in sorted(metrics):
             metric_val = metrics[metric_name]
             self.log(
@@ -316,15 +339,19 @@ class SMORT(LightningModule):
                 batch_size=bs,
             )
 
-        # Log the current epoch's losses
-        for loss_name in sorted(losses):
-            loss_val = losses[loss_name]
-            self.log(
-                f"val_{loss_name}",
-                loss_val,
-                on_epoch=True,
-                on_step=False,
-                batch_size=bs,
+        if (
+            self.viz_interval != -1
+            and (
+                (self.trainer.current_epoch) % self.viz_interval == 0
+                or self.trainer.current_epoch + 1 == self.trainer.max_epochs
+            )
+            and batch_idx == 0
+        ):
+            self.viz_random_from_batch(
+                pred_motions,
+                gt_motions,
+                batch["reactor_x_dict"]["mask"],
+                output="local_val_viz.mp4",
             )
 
         # import pdb; pdb.set_trace()
@@ -334,56 +361,35 @@ class SMORT(LightningModule):
             logger.info(
                 f"Val Epoch {self.trainer.current_epoch} - Metrics dict: {metrics_dict} - Loss dict: {loss_dict}"
             )
-            if (
-                self.viz_interval != -1
-                and self.trainer.current_epoch % self.viz_interval == 0
-            ):
-                randidx = random.randint(0, bs - 1)
-                pred_joints, gt_joints = (
-                    feats_to_joints(
-                        self.joint_loss_fn.denorm(
-                            pred_motions[randidx][
-                                batch["reactor_x_dict"]["mask"][randidx], ...
-                            ]
-                        )
-                    ),
-                    feats_to_joints(
-                        self.joint_loss_fn.denorm(
-                            gt_motions[randidx][
-                                batch["reactor_x_dict"]["mask"][randidx], ...
-                            ]
-                        )
-                    ),
-                )
-                self.render_motion(pred_joints, gt_joints, "local_val_viz.mp4")
-
         return losses["loss"]
 
+    def test_step(self, batch: Dict, batch_idx: int) -> torch.Tensor:
+        bs = len(batch["reactor_x_dict"]["x"])
 
-def cosine_annealing_lambda(
-    epoch: int, num_epochs: int, initial_lambda: float, num_peaks: int
-) -> float:
-    """
-    Returns a lambda value based on a generalized cosine annealing schedule for n peaks.
-    :param epoch: Current epoch.
-    :param num_epochs: Total number of epochs.
-    :param initial_lambda: Initial value of lambda.
-    :param num_peaks: Number of peaks desired in the schedule.
-    :return: Adjusted lambda value.
-    """
-    # Adjusted formula to create `num_peaks` peaks within `num_epochs`
-    return (
-        (
-            initial_lambda
-            * 0.5
-            * (
-                1
-                - torch.cos(
-                    torch.tensor(2 * num_peaks * epoch * 3.14159265 / num_epochs)
-                )
-            )
+        losses, pred_motions, gt_motions = self.compute_loss(batch)
+        assert type(losses) is dict
+
+        metrics = self.joint_loss_fn.evaluate_metrics(
+            pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
         )
-        .detach()
-        .cpu()
-        .item()
-    )
+
+        for loss_name in sorted(losses):
+            loss_val = losses[loss_name]
+            self.log(
+                f"test_{loss_name}",
+                loss_val,
+                on_epoch=True,
+                on_step=False,
+                batch_size=bs,
+            )
+        for metric_name in sorted(metrics):
+            metric_val = metrics[metric_name]
+            self.log(
+                f"test_{metric_name}",
+                metric_val,
+                on_epoch=True,
+                on_step=True,
+                batch_size=bs,
+            )
+
+        return losses["loss"]

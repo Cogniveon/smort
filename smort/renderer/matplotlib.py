@@ -1,67 +1,34 @@
 import logging
 from dataclasses import dataclass, field
-from typing import Iterable, List, Optional, Tuple
+from typing import List, Tuple
 
+from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.animation import FuncAnimation
 
-from smort.rifke import canonicalize_rotation
 
 logger = logging.getLogger("matplotlib.animation")
 logger.setLevel(logging.ERROR)
 
-KINEMATIC_TREES = {
-    "smplxjoints": [
-        [0, 3, 6, 9, 12, 15],
-        [9, 13, 16, 18, 20],
-        [9, 14, 17, 19, 21],
-        [0, 1, 4, 7, 10],
-        [0, 2, 5, 8, 11],
-    ],
-    "smpljoints": [
-        [0, 3, 6, 9, 12, 15],
-        [9, 13, 16, 18, 20],
-        [9, 14, 17, 19, 21],
-        [0, 1, 4, 7, 10],
-        [0, 2, 5, 8, 11],
-    ],
-    "guoh3djoints": [  # no hands
-        [0, 3, 6, 9, 12, 15],
-        [9, 13, 16, 18, 20],
-        [9, 14, 17, 19, 21],
-        [0, 1, 4, 7, 10],
-        [0, 2, 5, 8, 11],
-    ],
-}
-
-
 @dataclass
 class SceneRenderer:
-    jointstype: str = "smplxjoints"
     fps: float = 20.0
-    colors: List[Iterable[str]] = field(
-        default_factory=lambda: [
-            ("green", "green", "green", "green", "green"),
-            ("red", "red", "red", "red", "red"),
-            ("blue", "blue", "blue", "blue", "blue"),
-            ("magenta", "magenta", "magenta", "magenta", "magenta"),
-            ("black", "black", "black", "black", "black"),
-        ]
+    colors: List[str] = field(
+        default_factory=lambda: ["red", "green", "blue", "yellow", "black"]
     )
     figsize: Tuple[int, int] = (4, 4)
     fontsize: int = 15
-    canonicalize: bool = False
 
     def render_animation(
         self,
-        joints_input: list[np.ndarray | torch.Tensor],
-        highlights_list: Optional[List[np.ndarray]] = None,
+        motions: List[np.ndarray | torch.Tensor],
         title: str = "",
         output: str = "notebook",
-        jointstype: str = "smpljoints",
         agg: bool = True,
     ):
         if agg:
@@ -69,76 +36,70 @@ class SceneRenderer:
 
             matplotlib.use("Agg")
 
-        jointstype = jointstype if jointstype is not None else self.jointstype
-        assert jointstype in KINEMATIC_TREES
-        kinematic_tree = KINEMATIC_TREES[jointstype]
-
+        kinematic_tree = [
+            [0, 3, 6, 9, 12, 15],
+            [9, 13, 16, 18, 20],
+            [9, 14, 17, 19, 21],
+            [0, 1, 4, 7, 10],
+            [0, 2, 5, 8, 11],
+        ]
         x, y, z = 0, 1, 2
 
-        joints_list = []
-        for joints in joints_input:
-            if not isinstance(joints, np.ndarray):
-                joints = joints.detach().cpu().numpy()
-            joints_list.append(joints)
-        if self.canonicalize:
-            joints_list = [
-                canonicalize_rotation(joints, jointstype=jointstype)
-                for joints in joints_list
-            ]
+        motions = [
+            (
+                motion.detach().cpu().numpy()
+                if isinstance(motion, torch.Tensor)
+                else motion
+            )
+            for motion in motions
+        ]
+        assert type(motions[0]) == np.ndarray
 
         fig = plt.figure(figsize=self.figsize)
         ax = self.init_axis(fig, title)
 
-        trajectories = [joints[:, 0, [x, y]] for joints in joints_list]
+        trajectories = [joints[:, 0, [x, y]] for joints in motions]
         avg_segment_length = (
             np.mean(np.linalg.norm(np.diff(trajectories[0], axis=0), axis=1)) + 1e-3
         )
         draw_offset = int(25 / avg_segment_length)
 
         spline_lines = [
-            ax.plot(*trajectory.T, zorder=10, color=self.colors[i][0])[0] for i, trajectory in enumerate(trajectories)  # type: ignore
+            ax.plot(*trajectory.T, zorder=10, color=self.colors[i])[0]
+            for i, trajectory in enumerate(trajectories)
         ]
-
-        all_joints = np.concatenate(joints_list, axis=1)
-        minx, miny, _ = np.min(all_joints, axis=(0, 1))
-        maxx, maxy, _ = np.max(all_joints, axis=(0, 1))
+        all_motions = np.concatenate(motions, axis=1)
+        minx, miny, _ = np.min(all_motions, axis=(0, 1))
+        maxx, maxy, _ = np.max(all_motions, axis=(0, 1))
         self.plot_floor(ax, minx, maxx, miny, maxy, 0)
 
-        height_offsets = [np.min(joints[:, :, z]) for joints in joints_list]
-        for joints, offset in zip(joints_list, height_offsets):
+        height_offsets = [np.min(joints[:, :, z]) for joints in motions]
+        for joints, offset in zip(motions, height_offsets):
             joints[:, :, z] -= offset
-
-        lines_list = [[] for _ in range(len(joints_list))]
+        
+        skel_list: list[list[Line2D]] = [[] for _ in range(len(motions))]
         initialized = False
-
+        
         def update(frame):
             nonlocal initialized
-            mean_root = np.zeros_like(joints_list[0][0, 0])
+            mean_root = np.zeros_like(motions[0][0, 0])
 
-            for idx, (joints, lines, colors) in enumerate(
-                zip(joints_list, lines_list, self.colors)
+            for idx, (motion, skel, color) in enumerate(
+                zip(motions, skel_list, self.colors)
             ):
-                skeleton = joints[frame]
-
-                mean_root += skeleton[0]
-
-                hcolors = colors
-                if (
-                    highlights_list
-                    and highlights_list[idx] is not None
-                    and highlights_list[idx][frame]
-                ):
-                    hcolors = ["yellow"] * 5
-
-                for i, (chain, color) in enumerate(
-                    zip(reversed(kinematic_tree), reversed(list(hcolors)))
+                joints = motion[frame]
+                
+                mean_root += joints[0]
+                
+                for i, chain in enumerate(
+                    reversed(kinematic_tree)
                 ):
                     if not initialized:
-                        lines.append(
+                        skel.append(
                             ax.plot(
-                                skeleton[chain, x],
-                                skeleton[chain, y],
-                                skeleton[chain, z],
+                                joints[chain, x],
+                                joints[chain, y],
+                                joints[chain, z],
                                 linewidth=6.0,
                                 color=color,
                                 zorder=20,
@@ -146,43 +107,44 @@ class SceneRenderer:
                             )[0]
                         )
                     else:
-                        lines[i].set_xdata(skeleton[chain, x])
-                        lines[i].set_ydata(skeleton[chain, y])
-                        lines[i].set_3d_properties(skeleton[chain, z])
-                        lines[i].set_color(color)
-
+                        skel[i].set_xdata(joints[chain, x])
+                        skel[i].set_ydata(joints[chain, y])
+                        skel[i].set_3d_properties(joints[chain, z]) # type: ignore
+                        skel[i].set_color(color)
+        
                 left = max(frame - draw_offset, 0)
                 right = min(frame + draw_offset, trajectories[idx].shape[0])
 
                 spline_lines[idx].set_xdata(trajectories[idx][left:right, 0])
                 spline_lines[idx].set_ydata(trajectories[idx][left:right, 1])
-                spline_lines[idx].set_3d_properties(
+                spline_lines[idx].set_3d_properties( # type: ignore
                     np.zeros_like(trajectories[idx][left:right, 0])
                 )
 
-            mean_root /= len(joints_list)
+            mean_root /= len(motions)
 
             self.update_camera(ax, mean_root)
             initialized = True
             return []
 
-        frames = min(joints.shape[0] for joints in joints_list)
+        frames = min(joints.shape[0] for joints in motions)
         anim = FuncAnimation(
             fig, update, frames=frames, interval=1000 / self.fps, repeat=False
         )
 
         if output == "notebook":
             from IPython.display import HTML, display
-
             display(HTML(anim.to_jshtml()))
         else:
             anim.save(output, fps=int(self.fps))
 
-        plt.close()
-
+        plt.close()        
+        
+        
     @staticmethod
-    def init_axis(fig, title, radius=1.5):
+    def init_axis(fig: Figure, title, radius=1.5):
         ax = fig.add_subplot(1, 1, 1, projection="3d")
+        assert type(ax) == Axes3D
         ax.view_init(elev=20.0, azim=-60)
 
         fact = 2
@@ -193,7 +155,7 @@ class SceneRenderer:
         ax.set_aspect("auto")
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-        ax.set_zticklabels([])
+        ax.set_zticklabels([]) # type: ignore
 
         ax.set_axis_off()
         ax.grid(b=False)
