@@ -96,7 +96,7 @@ class SceneRenderer:
         draw_offset = int(25 / avg_segment_length)
 
         spline_lines = [
-            ax.plot(*trajectory.T, zorder=10)[0] for trajectory in trajectories
+            ax.plot(*trajectory.T, zorder=10, color=self.colors[i][0])[0] for i, trajectory in enumerate(trajectories)  # type: ignore
         ]
 
         all_joints = np.concatenate(joints_list, axis=1)
@@ -113,14 +113,14 @@ class SceneRenderer:
 
         def update(frame):
             nonlocal initialized
+            mean_root = np.zeros_like(joints_list[0][0, 0])
 
             for idx, (joints, lines, colors) in enumerate(
                 zip(joints_list, lines_list, self.colors)
             ):
                 skeleton = joints[frame]
 
-                root = skeleton[0]
-                self.update_camera(ax, root)
+                mean_root += skeleton[0]
 
                 hcolors = colors
                 if (
@@ -160,6 +160,9 @@ class SceneRenderer:
                     np.zeros_like(trajectories[idx][left:right, 0])
                 )
 
+            mean_root /= len(joints_list)
+
+            self.update_camera(ax, mean_root)
             initialized = True
             return []
 
