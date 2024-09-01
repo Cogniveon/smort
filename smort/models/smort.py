@@ -262,9 +262,18 @@ class SMORT(LightningModule):
         losses, pred_motions, gt_motions = self.compute_loss(batch)
         assert type(losses) is dict
 
-        metrics = self.joint_loss_fn.evaluate_metrics(
-            pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
-        )
+        # metrics = self.joint_loss_fn.evaluate_metrics(
+        #     pred_motions, gt_motions, batch["reactor_x_dict"]["mask"]
+        # )
+        # for metric_name in sorted(metrics):
+        #     metric_val = metrics[metric_name]
+        #     self.log(
+        #         f"train_{metric_name}",
+        #         metric_val,
+        #         on_epoch=True,
+        #         on_step=True,
+        #         batch_size=bs,
+        #     )
 
         for loss_name in sorted(losses):
             loss_val = losses[loss_name]
@@ -275,15 +284,6 @@ class SMORT(LightningModule):
                 on_step=True,
                 batch_size=bs,
                 prog_bar=loss_name == "loss",
-            )
-        for metric_name in sorted(metrics):
-            metric_val = metrics[metric_name]
-            self.log(
-                f"train_{metric_name}",
-                metric_val,
-                on_epoch=True,
-                on_step=True,
-                batch_size=bs,
             )
 
         if (
@@ -303,9 +303,10 @@ class SMORT(LightningModule):
 
         if batch_idx == 0:
             loss_dict = {k: v.item() for k, v in losses.items()}
-            metrics_dict = {k: v.item() for k, v in metrics.items()}
+            # metrics_dict = {k: v.item() for k, v in metrics.items()}
+            # - Metrics dict: {metrics_dict}
             logger.info(
-                f"Train Epoch {self.trainer.current_epoch} - Loss dict: {loss_dict} - Metrics dict: {metrics_dict}"
+                f"Train Epoch {self.trainer.current_epoch} - Loss dict: {loss_dict}"
             )
 
         return losses["loss"]
