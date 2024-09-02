@@ -55,7 +55,7 @@ class JointLoss(nn.Module):
         pred_joints: torch.Tensor,
         gt_joints: torch.Tensor,
         feet_indices: list = [7, 8, 10, 11],
-        ground_threshold=0.005,
+        threshold=0.001,
     ):
         # Ensure that feet joints are close to the ground (y-coordinate close to 0)
         # For simplicity, we assume ground level is at y < 0.01
@@ -66,7 +66,7 @@ class JointLoss(nn.Module):
         gt_vel = relevant_gt_joints[1:, :, :] - relevant_gt_joints[:-1, :, :]
         gt_vel_norm = torch.linalg.norm(gt_vel, dim=2)
 
-        fc_mask = (gt_vel_norm <= ground_threshold).unsqueeze(2).expand(-1, -1, 3)
+        fc_mask = (gt_vel_norm <= threshold).unsqueeze(2).expand(-1, -1, 3)
         masked_pred_vel = pred_vel.clone()
         masked_pred_vel[~fc_mask] = 0
 

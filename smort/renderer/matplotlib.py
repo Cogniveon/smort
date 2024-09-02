@@ -2,18 +2,18 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Tuple
 
-from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.animation import FuncAnimation
-
+from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from mpl_toolkits.mplot3d import Axes3D
 
 logger = logging.getLogger("matplotlib.animation")
 logger.setLevel(logging.ERROR)
+
 
 @dataclass
 class SceneRenderer:
@@ -76,10 +76,10 @@ class SceneRenderer:
         height_offsets = [np.min(joints[:, :, z]) for joints in motions]
         for joints, offset in zip(motions, height_offsets):
             joints[:, :, z] -= offset
-        
+
         skel_list: list[list[Line2D]] = [[] for _ in range(len(motions))]
         initialized = False
-        
+
         def update(frame):
             nonlocal initialized
             mean_root = np.zeros_like(motions[0][0, 0])
@@ -88,12 +88,10 @@ class SceneRenderer:
                 zip(motions, skel_list, self.colors)
             ):
                 joints = motion[frame]
-                
+
                 mean_root += joints[0]
-                
-                for i, chain in enumerate(
-                    reversed(kinematic_tree)
-                ):
+
+                for i, chain in enumerate(reversed(kinematic_tree)):
                     if not initialized:
                         skel.append(
                             ax.plot(
@@ -109,15 +107,15 @@ class SceneRenderer:
                     else:
                         skel[i].set_xdata(joints[chain, x])
                         skel[i].set_ydata(joints[chain, y])
-                        skel[i].set_3d_properties(joints[chain, z]) # type: ignore
+                        skel[i].set_3d_properties(joints[chain, z])  # type: ignore
                         skel[i].set_color(color)
-        
+
                 left = max(frame - draw_offset, 0)
                 right = min(frame + draw_offset, trajectories[idx].shape[0])
 
                 spline_lines[idx].set_xdata(trajectories[idx][left:right, 0])
                 spline_lines[idx].set_ydata(trajectories[idx][left:right, 1])
-                spline_lines[idx].set_3d_properties( # type: ignore
+                spline_lines[idx].set_3d_properties(  # type: ignore
                     np.zeros_like(trajectories[idx][left:right, 0])
                 )
 
@@ -134,13 +132,77 @@ class SceneRenderer:
 
         if output == "notebook":
             from IPython.display import HTML, display
+
             display(HTML(anim.to_jshtml()))
         else:
             anim.save(output, fps=int(self.fps))
 
-        plt.close()        
-        
-        
+        plt.close()
+
+
+    def render_image(
+        self,
+        motions: List[np.ndarray | torch.Tensor],
+        num_trail_frames: int = 200,
+        frame_skip: int = 20,
+        title: str = "",
+        output: str = "notebook",
+    ):
+        # Convert tensors to numpy arrays if needed
+        motions = [
+            motion.detach().cpu().numpy() if isinstance(motion, torch.Tensor) else motion
+            for motion in motions
+        ]
+        assert type(motions[0]) == np.ndarray
+
+        kinematic_tree = [
+            [0, 3, 6, 9, 12, 15],
+            [9, 13, 16, 18, 20],
+            [9, 14, 17, 19, 21],
+            [0, 1, 4, 7, 10],
+            [0, 2, 5, 8, 11],
+        ]
+        x, y, z = 0, 1, 2
+
+        fig = plt.figure(figsize=self.figsize)
+        ax = self.init_axis(fig, title)
+
+        # Adjust motions to align the root joint (joint 0) with the floor
+        height_offsets = [np.min(joints[:, :, z]) for joints in motions]
+        for joints, offset in zip(motions, height_offsets):
+            joints[:, :, z] -= offset
+    
+        frames = min(joints.shape[0] for joints in motions)
+        start_frame = max(0, frames - num_trail_frames * frame_skip)
+
+        # Plot the skeletons with fading colors for each frame
+        for i, frame in enumerate(range(start_frame, frames, frame_skip)):
+            alpha = (i + 1) / num_trail_frames  # Calculate fading alpha
+
+            for motion, color in zip(motions, self.colors):
+                joints = motion[frame]
+                for chain in kinematic_tree:
+                    ax.plot(
+                        joints[chain, x],
+                        joints[chain, y],
+                        joints[chain, z],
+                        linewidth=6.0 * alpha,  # Adjust line width for fading
+                        color=color,
+                        alpha=alpha,  # Apply fading effect
+                        zorder=20,
+                    )
+
+        # Display or save the image
+        if output == "notebook":
+            from IPython.display import display
+
+            plt.show()
+        else:
+            fig.savefig(output)
+
+        plt.close()
+
+
     @staticmethod
     def init_axis(fig: Figure, title, radius=1.5):
         ax = fig.add_subplot(1, 1, 1, projection="3d")
@@ -155,7 +217,7 @@ class SceneRenderer:
         ax.set_aspect("auto")
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-        ax.set_zticklabels([]) # type: ignore
+        ax.set_zticklabels([])  # type: ignore
 
         ax.set_axis_off()
         ax.grid(b=False)

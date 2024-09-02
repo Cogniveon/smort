@@ -107,7 +107,7 @@ class ACTORStyleDecoder(nn.Module):
     ) -> None:
         super().__init__()
         self.nfeats = nfeats
-        
+
         self.context_proj = nn.Sequential(
             nn.Linear(nfeats, latent_dim // 2),
             nn.GELU(),
@@ -115,7 +115,7 @@ class ACTORStyleDecoder(nn.Module):
             nn.GELU(),
             nn.Linear(latent_dim // 2, latent_dim),
         )
-        
+
         self.sequence_pos_encoding = PositionalEncoding(
             latent_dim, dropout, batch_first=True
         )
@@ -142,8 +142,8 @@ class ACTORStyleDecoder(nn.Module):
         latent_dim = z.shape[1]
         bs, nframes = mask.shape
 
-        z = z[:, None]  # sequence of 1 element for the memory
-        c = self.context_proj(context['x'])
+        z = z[:, None]
+        c = self.context_proj(context["x"])
         c = torch.cat((z, c), dim=1)
 
         # Construct time queries

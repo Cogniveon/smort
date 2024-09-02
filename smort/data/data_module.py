@@ -65,7 +65,7 @@ class InterXDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
             persistent_workers=True,
         )
-    
+
     def test_dataloader(self):
         return DataLoader(
             self.test,
