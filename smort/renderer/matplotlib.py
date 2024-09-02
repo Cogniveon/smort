@@ -186,7 +186,7 @@ class SceneRenderer:
                         joints[chain, x],
                         joints[chain, y],
                         joints[chain, z],
-                        linewidth=6.0 * alpha,  # Adjust line width for fading
+                        linewidth=8.0 * alpha,  # Adjust line width for fading
                         color=color,
                         alpha=alpha,  # Apply fading effect
                         zorder=20,
