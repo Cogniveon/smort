@@ -143,18 +143,15 @@ class SceneRenderer:
     def render_image(
         self,
         motions: List[np.ndarray | torch.Tensor],
-        num_trail_frames: int = 200,
         frame_skip: int = 20,
         title: str = "",
         output: str = "notebook",
+        agg: bool = True,
     ):
-        # Convert tensors to numpy arrays if needed
-        motions = [
-            motion.detach().cpu().numpy() if isinstance(motion, torch.Tensor) else motion
-            for motion in motions
-        ]
-        assert type(motions[0]) == np.ndarray
+        if agg:
+            import matplotlib
 
+            matplotlib.use("Agg")
         kinematic_tree = [
             [0, 3, 6, 9, 12, 15],
             [9, 13, 16, 18, 20],
@@ -164,33 +161,41 @@ class SceneRenderer:
         ]
         x, y, z = 0, 1, 2
 
+        motions = [
+            (
+                motion.detach().cpu().numpy()
+                if isinstance(motion, torch.Tensor)
+                else motion
+            )
+            for motion in motions
+        ]
+        assert type(motions[0]) == np.ndarray
+
         fig = plt.figure(figsize=self.figsize)
+        plt.ion()
         ax = self.init_axis(fig, title)
 
-        # Adjust motions to align the root joint (joint 0) with the floor
+        trajectories = [joints[:, 0, [x, y]] for joints in motions]
+
+        spline_lines = [
+            ax.plot(*trajectory.T, zorder=10, color=self.colors[i])[0]
+            for i, trajectory in enumerate(trajectories)
+        ]
+        all_motions = np.concatenate(motions, axis=1)
+        minx, miny, _ = np.min(all_motions, axis=(0, 1))
+        maxx, maxy, _ = np.max(all_motions, axis=(0, 1))
+        mean_root = np.mean(all_motions, axis=(0))[0]
+        self.plot_floor(ax, minx, maxx, miny, maxy, 0)
+        self.update_camera(ax, mean_root)
+
         height_offsets = [np.min(joints[:, :, z]) for joints in motions]
         for joints, offset in zip(motions, height_offsets):
             joints[:, :, z] -= offset
-    
-        frames = min(joints.shape[0] for joints in motions)
-        start_frame = max(0, frames - num_trail_frames * frame_skip)
-
-        # Plot the skeletons with fading colors for each frame
-        for i, frame in enumerate(range(start_frame, frames, frame_skip)):
-            alpha = (i + 1) / num_trail_frames  # Calculate fading alpha
-
-            for motion, color in zip(motions, self.colors):
-                joints = motion[frame]
-                for chain in kinematic_tree:
-                    ax.plot(
-                        joints[chain, x],
-                        joints[chain, y],
-                        joints[chain, z],
-                        linewidth=8.0 * alpha,  # Adjust line width for fading
-                        color=color,
-                        alpha=alpha,  # Apply fading effect
-                        zorder=20,
-                    )
+        
+        # num_frames = motions[0].shape[0]
+        # for frame_idx in reversed(range(0, num_frames, num_frames // 10)):
+        #     print(frame_idx)
+        
 
         # Display or save the image
         if output == "notebook":

@@ -39,12 +39,14 @@ class TextMotionDataset(Dataset):
             else:
                 return num_scenes
 
-    def get_scene(self, scene_id: str | int):
+    def get_scene(self, scene_id: str | int, print_scene_text: bool = False):
         with h5py.File(self.dataset_path, "r") as f:
             motions_dataset = f["motions"]
             assert type(motions_dataset) is h5py.Group
             if type(scene_id) == int:
                 scene_id = list(motions_dataset.keys())[scene_id]
+            if print_scene_text:
+                print(f"Scene found: {scene_id}\n{open('deps/interx/texts/' + scene_id + '.txt').read()}") # type: ignore
             scene_dataset = motions_dataset[f"{scene_id}"]
             assert type(scene_dataset) is h5py.Dataset
 
