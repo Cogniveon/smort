@@ -108,13 +108,13 @@ class ACTORStyleDecoder(nn.Module):
         super().__init__()
         self.nfeats = nfeats
 
-        # self.context_proj = nn.Sequential(
-        #     nn.Linear(nfeats, latent_dim // 2),
-        #     nn.GELU(),
-        #     nn.Linear(latent_dim // 2, latent_dim // 2),
-        #     nn.GELU(),
-        #     nn.Linear(latent_dim // 2, latent_dim),
-        # )
+        self.context_proj = nn.Sequential(
+            nn.Linear(nfeats, latent_dim // 2),
+            nn.GELU(),
+            nn.Linear(latent_dim // 2, latent_dim // 2),
+            nn.GELU(),
+            nn.Linear(latent_dim // 2, latent_dim),
+        )
 
         self.sequence_pos_encoding = PositionalEncoding(
             latent_dim, dropout, batch_first=True
@@ -143,8 +143,8 @@ class ACTORStyleDecoder(nn.Module):
         bs, nframes = mask.shape
 
         z = z[:, None]
-        # c = self.context_proj(context["x"])
-        # c = torch.cat((z, c), dim=1)
+        c = self.context_proj(context["x"])
+        c = torch.cat((z, c), dim=1)
 
         # Construct time queries
         time_queries = torch.zeros(bs, nframes, latent_dim, device=z.device)
@@ -153,7 +153,7 @@ class ACTORStyleDecoder(nn.Module):
         # Pass through the transformer decoder
         # with the latent vector for memory
         output = self.seqTransDecoder(
-            tgt=time_queries, memory=z, tgt_key_padding_mask=~mask
+            tgt=time_queries, memory=c, tgt_key_padding_mask=~mask
         )
 
         output = self.final_layer(output)

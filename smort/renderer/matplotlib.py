@@ -199,7 +199,7 @@ class SceneRenderer:
                 yield frame, len(frames), (r, g, b)
 
         mean_root = np.zeros_like(motions[0][0, 0, :])
-        for idx, (motion, hue) in enumerate(zip(motions, [0.6, 0.9])):
+        for idx, (motion, hue) in enumerate(zip(motions, [0.6, 0.9, 0.3])):
             total_frames = len(motion)
             trajectory = motion[:, 0, [x, y]]
             ax.plot(*trajectory.T, zorder=10, color=colorsys.hls_to_rgb(hue, 0.3, 1))
