@@ -223,7 +223,7 @@ class SceneRenderer:
                             1
                             if frame_idx == total_frames - 1
                             or frame_idx in highlight_frames
-                            else max(0.1, 0.3 * frame_idx / total_frames)
+                            else max(0.2, 0.3 * frame_idx / total_frames)
                         ),
                         zorder=50 + int(1000 * frame_idx / total_frames),
                         path_effects=(
