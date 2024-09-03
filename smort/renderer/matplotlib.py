@@ -1,3 +1,4 @@
+import colorsys
 import logging
 from dataclasses import dataclass, field
 from typing import List, Tuple
@@ -139,19 +140,14 @@ class SceneRenderer:
 
         plt.close()
 
-
     def render_image(
         self,
         motions: List[np.ndarray | torch.Tensor],
-        frame_skip: int = 20,
+        step_frame: int = 80,
         title: str = "",
         output: str = "notebook",
-        agg: bool = True,
+        highlight_frames: list[int] = [],
     ):
-        if agg:
-            import matplotlib
-
-            matplotlib.use("Agg")
         kinematic_tree = [
             [0, 3, 6, 9, 12, 15],
             [9, 13, 16, 18, 20],
@@ -175,28 +171,71 @@ class SceneRenderer:
         plt.ion()
         ax = self.init_axis(fig, title)
 
-        trajectories = [joints[:, 0, [x, y]] for joints in motions]
-
-        spline_lines = [
-            ax.plot(*trajectory.T, zorder=10, color=self.colors[i])[0]
-            for i, trajectory in enumerate(trajectories)
-        ]
         all_motions = np.concatenate(motions, axis=1)
         minx, miny, _ = np.min(all_motions, axis=(0, 1))
         maxx, maxy, _ = np.max(all_motions, axis=(0, 1))
-        mean_root = np.mean(all_motions, axis=(0))[0]
         self.plot_floor(ax, minx, maxx, miny, maxy, 0)
-        self.update_camera(ax, mean_root)
 
         height_offsets = [np.min(joints[:, :, z]) for joints in motions]
         for joints, offset in zip(motions, height_offsets):
             joints[:, :, z] -= offset
-        
-        # num_frames = motions[0].shape[0]
-        # for frame_idx in reversed(range(0, num_frames, num_frames // 10)):
-        #     print(frame_idx)
-        
 
+        def iterate_frames(total_frames, focus_frame, hue):
+            start_frame = max(0, total_frames - 1)
+            frames = [
+                start_frame - i * step_frame
+                for i in range((start_frame // step_frame) + 1)
+                if start_frame - i * step_frame >= 0
+            ]
+            for frame in frames:
+                distance = abs(frame - focus_frame)
+                saturation = min(0.6, (distance / total_frames))
+                lightness = 0.4 + 0.3 * abs(frame - total_frames) / total_frames
+                # lightness = 0.2 if frame != frames[-1] else 0.5
+
+                # Convert HSL to RGB
+                r, g, b = colorsys.hls_to_rgb(hue, lightness, saturation)
+
+                yield frame, len(frames), (r, g, b)
+
+        mean_root = np.zeros_like(motions[0][0, 0, :])
+        for idx, (motion, hue) in enumerate(zip(motions, [0.6, 0.9])):
+            total_frames = len(motion)
+            trajectory = motion[:, 0, [x, y]]
+            ax.plot(*trajectory.T, zorder=10, color=colorsys.hls_to_rgb(hue, 0.3, 1))
+
+            for frame_idx, clip_len, color in iterate_frames(
+                total_frames, total_frames // 2, hue
+            ):
+                joints = motion[frame_idx]
+                print(f"Frame {frame_idx}: Color {color}")
+                line_width = 6.0 * (frame_idx / total_frames)
+                if total_frames == frame_idx + 1:
+                    mean_root += joints[0]
+                for i, chain in enumerate(reversed(kinematic_tree)):
+                    ax.plot(
+                        joints[chain, x],
+                        joints[chain, y],
+                        joints[chain, z],
+                        linewidth=line_width,
+                        color=color,
+                        alpha=(
+                            1
+                            if frame_idx == total_frames - 1
+                            or frame_idx in highlight_frames
+                            else max(0.1, 0.3 * frame_idx / total_frames)
+                        ),
+                        zorder=50 + int(1000 * frame_idx / total_frames),
+                        path_effects=(
+                            [pe.SimpleLineShadow(), pe.Normal()]
+                            if frame_idx == total_frames - 1
+                            or frame_idx in highlight_frames
+                            else []
+                        ),
+                    )
+        
+        self.update_camera(ax, mean_root / len(motions))
+        
         # Display or save the image
         if output == "notebook":
             from IPython.display import display
@@ -206,7 +245,6 @@ class SceneRenderer:
             fig.savefig(output)
 
         plt.close()
-
 
     @staticmethod
     def init_axis(fig: Figure, title, radius=1.5):
