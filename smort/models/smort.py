@@ -348,10 +348,6 @@ class SMORT(LightningModule):
 
         if (
             self.viz_interval != -1
-            and (
-                (self.trainer.current_epoch) % self.viz_interval == 0
-                or self.trainer.current_epoch + 1 == self.trainer.max_epochs
-            )
             and batch_idx == 0
         ):
             self.viz_random_from_batch(

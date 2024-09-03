@@ -2,7 +2,7 @@ defaults:
   - _self_
 
 _target_: smort.data.data_module.InterXDataModule
-dataset_file: deps/interx/processed/dataset.h5
+dataset_file: deps/interx/processed/interx_dataset_nfeats76.h5 
 batch_size: 1
 use_tiny: 1.0
 return_scene: true
