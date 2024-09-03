@@ -167,14 +167,14 @@ class SMORT(LightningModule):
         ref_motions = batch["reactor_x_dict"]["x"]
         mask = batch["reactor_x_dict"]["mask"]
 
-        # scene -> motion
-        s_motions, s_latents, s_dists = self(
-            batch["scene_x_dict"],
-            "scene",
-            mask=mask,
-            context=batch["actor_x_dict"],
-            return_all=True,
-        )
+        # # scene -> motion
+        # s_motions, s_latents, s_dists = self(
+        #     batch["scene_x_dict"],
+        #     "scene",
+        #     mask=mask,
+        #     context=batch["actor_x_dict"],
+        #     return_all=True,
+        # )
         # text -> motion
         t_motions, t_latents, t_dists = self(
             batch["text_x_dict"],
@@ -199,14 +199,14 @@ class SMORT(LightningModule):
         # fmt: off
         losses["recons"] = (
             + self.reconstruction_loss_fn(t_motions, ref_motions) # text -> motion
-            + self.reconstruction_loss_fn(s_motions, ref_motions) # scene -> motion
+            # + self.reconstruction_loss_fn(s_motions, ref_motions) # scene -> motion
             + self.reconstruction_loss_fn(m_motions, ref_motions) # motion -> motion
         )
-        losses["joint"] = (
-            + self.joint_loss_fn.forward(t_motions, ref_motions, mask)
-            + self.joint_loss_fn.forward(s_motions, ref_motions, mask)
-            + self.joint_loss_fn.forward(m_motions, ref_motions, mask)
-        )
+        # losses["joint"] = (
+        #     + self.joint_loss_fn.forward(t_motions, ref_motions, mask)
+        #     # + self.joint_loss_fn.forward(s_motions, ref_motions, mask)
+        #     + self.joint_loss_fn.forward(m_motions, ref_motions, mask)
+        # )
         # fmt: on
 
         # VAE losses
@@ -219,13 +219,13 @@ class SMORT(LightningModule):
 
             losses["kl"] = (
                 +self.kl_loss_fn(t_dists, ref_dists)  # text
-                + self.kl_loss_fn(s_dists, ref_dists)  # scene
-                + self.kl_loss_fn(ref_dists, s_dists)
+                # + self.kl_loss_fn(s_dists, ref_dists)  # scene
+                # + self.kl_loss_fn(ref_dists, s_dists)
                 + self.kl_loss_fn(ref_dists, t_dists)
             )
 
         # Latent manifold loss
-        losses["latent_s"] = self.latent_loss_fn(s_latents, m_latents)
+        # losses["latent_s"] = self.latent_loss_fn(s_latents, m_latents)
         losses["latent_t"] = self.latent_loss_fn(t_latents, m_latents)
 
         # Weighted average of the losses
