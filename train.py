@@ -18,9 +18,6 @@ def train(cfg: DictConfig):
     from smort.data.data_module import InterXDataModule
     from smort.models.smort import SMORT
     
-    if cfg.resume_from_ckpt is not None and not os.path.exists(cfg.resume_from_ckpt):
-        raise ValueError(f"cfg.resume_from_ckpt is not a valid checkpoint! ({cfg.resume_from_ckpt})")
-    
     config_path = save_config(cfg)
     logger.info(f"The config can be found here: {config_path}")
 
