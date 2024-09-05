@@ -20,4 +20,4 @@ lmd:
     kl: 1.0e-4
 lr: 1e-4
 # viz_interval: -1
-viz_interval: 50
+viz_interval: 1

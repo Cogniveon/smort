@@ -8,3 +8,4 @@ defaults:
 
 seed: 42
 run_dir: outputs/${hydra:runtime.choices.model}_${hydra:runtime.choices.data}
+resume_from_ckpt: null

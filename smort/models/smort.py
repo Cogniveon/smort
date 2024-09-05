@@ -5,6 +5,7 @@ from typing import Dict, List, Literal, Optional
 import torch
 from pytorch_lightning import LightningModule
 from torch.optim.adamw import AdamW
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from smort.data.collate import length_to_mask
 from smort.models.losses import JointLoss, KLLoss
@@ -106,10 +107,15 @@ class SMORT(LightningModule):
         self.viz_interval = viz_interval
 
     def configure_optimizers(self):
-        optimizer = AdamW(lr=self.lr, params=self.parameters())
+        optimizer = AdamW(
+            lr=self.lr,
+            params=self.parameters(),
+            weight_decay=1e-5,
+        )
         return {
             "optimizer": optimizer,
-            # "lr_scheduler": CosineAnnealingLR(optimizer, self.trainer.max_epochs or 100)
+            "lr_scheduler": ReduceLROnPlateau(optimizer, mode="min"),
+            "monitor": "val_loss"
         }
 
     def forward(
@@ -346,10 +352,7 @@ class SMORT(LightningModule):
                 batch_size=bs,
             )
 
-        if (
-            self.viz_interval != -1
-            and batch_idx == 0
-        ):
+        if self.viz_interval != -1 and batch_idx == 0:
             self.viz_random_from_batch(
                 pred_motions,
                 gt_motions,

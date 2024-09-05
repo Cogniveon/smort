@@ -12,10 +12,11 @@
             "args": [
                 "data.batch_size=1",
                 "data.dataset_file=deps/interx/processed/dataset.h5",
-                "data.use_tiny=0.05",
+                "data.use_tiny=0.01",
                 "trainer.accelerator=cpu",
                 "trainer.max_epochs=500",
-                "+trainer.fast_dev_run=true",
+                // "+trainer.fast_dev_run=true",
+                "resume_from_ckpt=artifacts/model-xwis7v3p:v0/model.ckpt",
             ],
             "console": "integratedTerminal",
             "justMyCode": true
