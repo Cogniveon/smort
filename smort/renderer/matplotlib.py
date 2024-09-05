@@ -19,8 +19,12 @@ logger.setLevel(logging.ERROR)
 @dataclass
 class SceneRenderer:
     fps: float = 20.0
-    colors: List[str] = field(
-        default_factory=lambda: ["red", "green", "blue", "yellow", "black"]
+    colors: List[tuple] = field(
+        default_factory=lambda: [
+            colorsys.hls_to_rgb(0.6, 0.3, 1),
+            colorsys.hls_to_rgb(0.9, 0.3, 1),
+            colorsys.hls_to_rgb(0.3, 0.3, 1),
+        ]
     )
     figsize: Tuple[int, int] = (4, 4)
     fontsize: int = 15
@@ -233,9 +237,9 @@ class SceneRenderer:
                             else []
                         ),
                     )
-        
+
         self.update_camera(ax, mean_root / len(motions))
-        
+
         # Display or save the image
         if output == "notebook":
             from IPython.display import display
