@@ -20,6 +20,17 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Debug server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "app.py",
+            "args": [
+                "data.dataset_file=deps/interx/processed/dataset.h5",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

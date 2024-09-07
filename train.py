@@ -17,7 +17,7 @@ def train(cfg: DictConfig):
 
     from smort.data.data_module import InterXDataModule
     from smort.models.smort import SMORT
-    
+
     config_path = save_config(cfg)
     logger.info(f"The config can be found here: {config_path}")
 
@@ -31,19 +31,24 @@ def train(cfg: DictConfig):
     mean, std = data_module.dataset.get_mean_std()
     logger.info("Loading trainer")
     trainer: pl.Trainer = instantiate(cfg.trainer)
-    
+
     if not cfg.resume_from_ckpt:
         model: SMORT = instantiate(cfg.model, data_mean=mean, data_std=std)
     else:
         try:
             from pytorch_lightning.loggers.wandb import WandbLogger
+
             if type(trainer.logger) == WandbLogger:
                 model_id = Path(cfg.resume_from_ckpt).parent.name
-                trainer.logger.download_artifact(f"rohit-k-kesavan/smort/{model_id}", artifact_type="model")
+                trainer.logger.download_artifact(
+                    f"rohit-k-kesavan/smort/{model_id}", artifact_type="model"
+                )
         except Exception as e:
             logger.error(e)
 
-        model = SMORT.load_from_checkpoint(cfg.resume_from_ckpt, data_mean=mean, data_std=std)
+        model = SMORT.load_from_checkpoint(
+            cfg.resume_from_ckpt, data_mean=mean, data_std=std
+        )
 
     trainer.fit(model, data_module)
     trainer.test(model, data_module)

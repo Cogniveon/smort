@@ -17,6 +17,7 @@ class InterXDataModule(pl.LightningDataModule):
         num_workers=os.cpu_count(),
         use_tiny: float = 1.0,
         return_scene: bool = False,
+        return_scene_text: bool = False,
     ) -> None:
         super().__init__()
         self.dataset_file = dataset_file
@@ -24,6 +25,7 @@ class InterXDataModule(pl.LightningDataModule):
         self.num_workers = num_workers or 1
         self.use_tiny = use_tiny
         self.return_scene = return_scene
+        self.return_scene_text = return_scene_text
 
     def prepare_data(self):
         if not os.path.exists(self.dataset_file):
@@ -35,7 +37,10 @@ class InterXDataModule(pl.LightningDataModule):
     def setup(self, stage: str) -> None:
         self.prepare_data()
         self.dataset = TextMotionDataset(
-            self.dataset_file, use_tiny=self.use_tiny, return_scene=self.return_scene
+            self.dataset_file,
+            use_tiny=self.use_tiny,
+            return_scene=self.return_scene,
+            return_scene_text=self.return_scene_text,
         )
 
         total_scenes = len(self.dataset)
@@ -75,5 +80,5 @@ class InterXDataModule(pl.LightningDataModule):
             persistent_workers=True,
         )
 
-    def get_scene(self, scene_id: str | int, print_scene_text: bool = False):
-        return self.dataset.get_scene(scene_id, print_scene_text)
+    def get_sample(self, scene_id: str | int):
+        return self.dataset.get_scene(scene_id)

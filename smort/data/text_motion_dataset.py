@@ -19,11 +19,13 @@ class TextMotionDataset(Dataset):
         device: torch.device = torch.device("cpu"),
         use_tiny: float = 1.0,
         return_scene: bool = False,
+        return_scene_text: bool = False,
     ):
         self.collate_fn = collate_text_motion
         self.dataset_path = path
         self.motion_only = motion_only
         self.return_scene = return_scene
+        self.return_scene_text = return_scene_text
         self.normalize = normalize
         self.use_tiny = use_tiny
         self.eps = eps
@@ -39,14 +41,13 @@ class TextMotionDataset(Dataset):
             else:
                 return num_scenes
 
-    def get_scene(self, scene_id: str | int, print_scene_text: bool = False):
+    def get_scene(self, scene_id: str | int):
         with h5py.File(self.dataset_path, "r") as f:
             motions_dataset = f["motions"]
             assert type(motions_dataset) is h5py.Group
             if type(scene_id) == int:
-                scene_id = list(motions_dataset.keys())[scene_id]
-            if print_scene_text:
-                print(f"Scene found: {scene_id}\n{open('deps/interx/texts/' + scene_id + '.txt').read()}") # type: ignore
+                scene_id = str(list(motions_dataset.keys())[scene_id])
+            assert type(scene_id) == str
             scene_dataset = motions_dataset[f"{scene_id}"]
             assert type(scene_dataset) is h5py.Dataset
 
@@ -65,7 +66,9 @@ class TextMotionDataset(Dataset):
                 reactor_motion = (reactor_motion - mean) / (std + self.eps)
                 actor_motion = (actor_motion - mean) / (std + self.eps)
 
-            ret_dict = {}
+            ret_dict: dict[str, str | list[str] | dict[str, int | torch.Tensor]] = {
+                "scene_id": scene_id,
+            }
             ret_dict["reactor_x_dict"] = {
                 "x": torch.tensor(
                     reactor_motion, dtype=torch.float32, device=self.device
@@ -78,6 +81,10 @@ class TextMotionDataset(Dataset):
                 ),
                 "length": actor_len,
             }
+            if self.return_scene_text:
+                ret_dict["text"] = (
+                    open("deps/interx/texts/" + scene_id + ".txt").read().split("\n")
+                )
 
             if not self.motion_only:
                 texts_dataset = f[f"texts/{scene_id}"]
@@ -90,6 +97,8 @@ class TextMotionDataset(Dataset):
 
             if self.return_scene:
                 ret_dict["scene_x_dict"] = {}
+                assert type(ret_dict["reactor_x_dict"]["x"]) == torch.Tensor
+                assert type(ret_dict["actor_x_dict"]["x"]) == torch.Tensor
                 ret_dict["scene_x_dict"]["x"] = torch.cat(
                     (
                         ret_dict["reactor_x_dict"]["x"],
@@ -122,9 +131,7 @@ class TextMotionDataset(Dataset):
             assert type(mean) == np.ndarray and type(std) == np.ndarray
             return mean, std + self.eps
 
-    def reverse_norm(
-        self, motion: np.ndarray | torch.Tensor
-    ) -> np.ndarray | torch.Tensor:
+    def reverse_norm(self, motion: np.ndarray | torch.Tensor) -> np.ndarray:
         if type(motion) is torch.Tensor:
             motion = motion.detach().cpu().numpy()
         assert type(motion) == np.ndarray

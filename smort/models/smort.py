@@ -115,7 +115,7 @@ class SMORT(LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": ReduceLROnPlateau(optimizer, mode="min"),
-            "monitor": "val_loss"
+            "monitor": "val_loss",
         }
 
     def forward(

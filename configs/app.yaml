@@ -1,0 +1,7 @@
+defaults:
+  - data: interx
+  - server: inference
+  - defaults
+  - _self_
+
+debug: true

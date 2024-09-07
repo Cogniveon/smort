@@ -35,7 +35,7 @@ def visualize(cfg: DictConfig):
     else:
         model: SMORT = instantiate(cfg.model, data_mean=mean, data_std=std)
 
-    sample = data_module.get_scene(cfg.input)
+    sample = data_module.get_sample(cfg.input)
     sample = data_module.dataset.collate_fn([sample])
 
     if cfg.infer_type == "actor":

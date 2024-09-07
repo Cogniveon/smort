@@ -19,19 +19,13 @@ logger.setLevel(logging.ERROR)
 @dataclass
 class SceneRenderer:
     fps: float = 20.0
-    colors: List[tuple] = field(
-        default_factory=lambda: [
-            colorsys.hls_to_rgb(0.6, 0.3, 1),
-            colorsys.hls_to_rgb(0.9, 0.3, 1),
-            colorsys.hls_to_rgb(0.3, 0.3, 1),
-        ]
-    )
     figsize: Tuple[int, int] = (4, 4)
     fontsize: int = 15
 
     def render_animation(
         self,
         motions: List[np.ndarray | torch.Tensor],
+        hues: list[float] = [0.6, 0.9, 0.3],
         title: str = "",
         output: str = "notebook",
         agg: bool = True,
@@ -41,6 +35,7 @@ class SceneRenderer:
 
             matplotlib.use("Agg")
 
+        colors: List[tuple] = [colorsys.hls_to_rgb(hue, 0.3, 1) for hue in hues]
         kinematic_tree = [
             [0, 3, 6, 9, 12, 15],
             [9, 13, 16, 18, 20],
@@ -70,7 +65,7 @@ class SceneRenderer:
         draw_offset = int(25 / avg_segment_length)
 
         spline_lines = [
-            ax.plot(*trajectory.T, zorder=10, color=self.colors[i])[0]
+            ax.plot(*trajectory.T, zorder=10, color=colors[i])[0]
             for i, trajectory in enumerate(trajectories)
         ]
         all_motions = np.concatenate(motions, axis=1)
@@ -90,7 +85,7 @@ class SceneRenderer:
             mean_root = np.zeros_like(motions[0][0, 0])
 
             for idx, (motion, skel, color) in enumerate(
-                zip(motions, skel_list, self.colors)
+                zip(motions, skel_list, colors)
             ):
                 joints = motion[frame]
 
@@ -147,6 +142,7 @@ class SceneRenderer:
     def render_image(
         self,
         motions: List[np.ndarray | torch.Tensor],
+        colors: list[float] = [0.6, 0.9, 0.3],
         step_frame: int = 80,
         title: str = "",
         output: str = "notebook",
@@ -203,7 +199,7 @@ class SceneRenderer:
                 yield frame, len(frames), (r, g, b)
 
         mean_root = np.zeros_like(motions[0][0, 0, :])
-        for idx, (motion, hue) in enumerate(zip(motions, [0.6, 0.9, 0.3])):
+        for idx, (motion, hue) in enumerate(zip(motions, colors)):
             total_frames = len(motion)
             trajectory = motion[:, 0, [x, y]]
             ax.plot(*trajectory.T, zorder=10, color=colorsys.hls_to_rgb(hue, 0.3, 1))
@@ -212,7 +208,7 @@ class SceneRenderer:
                 total_frames, total_frames // 2, hue
             ):
                 joints = motion[frame_idx]
-                print(f"Frame {frame_idx}: Color {color}")
+                # print(f"Frame {frame_idx}: Color {color}")
                 line_width = 6.0 * (frame_idx / total_frames)
                 if total_frames == frame_idx + 1:
                     mean_root += joints[0]

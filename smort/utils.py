@@ -9,6 +9,10 @@ from omegaconf import ListConfig
 from smplx import SMPLX
 from tqdm.auto import tqdm
 
+from smort.data.data_module import InterXDataModule
+from smort.models.smort import SMORT
+from smort.rifke import feats_to_joints
+
 
 def get_smplx_model(
     batch_size: Optional[int] = None,
@@ -136,3 +140,91 @@ def loop_interx(
                 continue
             pbar.set_postfix(dict(scene_id=scene_id))
             yield scene_id, motions, end, texts
+
+
+def get_random_sample_from_dataset(
+    dataset_path: str = "deps/interx/processed/dataset.h5",
+    scene_id: Optional[str | int] = None,
+):
+    # text_motion_dataset = TextMotionDataset(
+    #     "deps/interx/processed/dataset.h5",
+    # )
+    # train_dataloader = DataLoader(
+    #     text_motion_dataset,
+    #     batch_size=1,
+    #     collate_fn=text_motion_dataset.collate_fn,
+    #     shuffle=True,
+    #     # num_workers=7,
+    #     # persistent_workers=True,
+    # )
+    # mean, std = text_motion_dataset.get_mean_std()
+    # assert type(mean) == torch.Tensor and type(std) == torch.Tensor
+    # model = SMORT(mean, std)
+
+    # trainer = Trainer(
+    #     accelerator="cpu", max_epochs=10, fast_dev_run=False, num_sanity_val_steps=0
+    # )
+
+    # trainer.fit(model, data_module)
+
+    data_module = InterXDataModule(
+        dataset_path,
+        batch_size=1,
+        num_workers=1,
+        use_tiny=1.0,
+        return_scene=True,
+        return_scene_text=True,
+    )
+    data_module.setup("train")
+
+    if scene_id:
+        sample = data_module.dataset.collate_fn([data_module.get_sample(scene_id)])
+    else:
+        scene_idx = random.randint(0, len(data_module.dataset))
+        print(f"Random Scene: {scene_idx}")
+        sample = data_module.dataset.collate_fn([data_module.get_sample(scene_idx)])
+
+    return sample, data_module.dataset
+
+
+def get_joints_from_ckpt(
+    model_ckpt: str = "model-xwis7v3p:v0",
+    scene_id: Optional[str | int] = None,
+):
+    if not os.path.exists(f"artifacts/{model_ckpt}/model.ckpt"):
+        import wandb
+
+        run = wandb.init()
+        artifact = run.use_artifact(f"rohit-k-kesavan/smort/{model_ckpt}", type="model")
+        artifact_dir = artifact.download()
+        print(f"Checkpoint downloaded: {artifact_dir}")
+
+    sample, dataset = get_random_sample_from_dataset(scene_id=scene_id)
+    mean, std = dataset.get_mean_std()
+
+    model = SMORT.load_from_checkpoint(
+        f"artifacts/{model_ckpt}/model.ckpt",
+        data_mean=mean,
+        data_std=std,
+    )
+
+    encoded = model.text_encoder(sample["text_x_dict"])
+
+    dists = encoded.unbind(1)
+    mu, logvar = dists
+    latent_vectors = mu
+    motion = dataset.reverse_norm(
+        model.motion_decoder(
+            {
+                "z": latent_vectors,
+                "mask": sample["reactor_x_dict"]["mask"],
+            },
+            sample["actor_x_dict"],
+        ).squeeze(dim=0)
+    )
+
+    return (
+        motion,
+        sample,
+        dataset,
+    )

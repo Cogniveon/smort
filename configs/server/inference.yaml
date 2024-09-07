@@ -1,0 +1,2 @@
+_target_: smort.api.inference.App
+dataset_file: ${data.dataset_file}
