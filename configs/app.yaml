@@ -1,7 +1,15 @@
 defaults:
   - data: interx
+  - model: smort
   - server: inference
   - defaults
   - _self_
 
 debug: true
+device: cpu
+ckpt: artifacts/model-m5gbh07p:v0/model.ckpt
+text_encoder:
+  _target_: smort.models.text_encoder.TextToEmb
+  modelpath: distilbert/distilbert-base-uncased
+  mean_pooling: false
+  device: ${device}

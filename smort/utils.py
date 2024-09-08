@@ -8,6 +8,7 @@ import torch
 from omegaconf import ListConfig
 from smplx import SMPLX
 from tqdm.auto import tqdm
+import plotly.graph_objects as go
 
 from smort.data.data_module import InterXDataModule
 from smort.models.smort import SMORT
@@ -141,6 +142,110 @@ def loop_interx(
             pbar.set_postfix(dict(scene_id=scene_id))
             yield scene_id, motions, end, texts
 
+
+
+def plot_floor(fig: go.Figure, joints: list[np.ndarray], minz: float = 0.0):
+    all_joints = np.concatenate(joints, axis=1)
+    minx, miny, _ = np.min(all_joints, axis=(0, 1))
+    maxx, maxy, _ = np.max(all_joints, axis=(0, 1))
+
+    # Vertices for the solid floor
+    verts_solid = [
+        [minx, miny, minz],
+        [minx, maxy, minz],
+        [maxx, maxy, minz],
+        [maxx, miny, minz],
+    ]
+
+    # Vertices for the translucent floor
+    radius = max((maxx - minx), (maxy - miny))
+    minx_all = (maxx + minx) / 2 - radius
+    maxx_all = (maxx + minx) / 2 + radius
+    miny_all = (maxy + miny) / 2 - radius
+    maxy_all = (maxy + miny) / 2 + radius
+
+    verts_translucent = [
+        [minx_all, miny_all, minz],
+        [minx_all, maxy_all, minz],
+        [maxx_all, maxy_all, minz],
+        [maxx_all, miny_all, minz],
+    ]
+
+    # Solid floor
+    fig.add_trace(
+        go.Mesh3d(
+            x=[v[0] for v in verts_solid],
+            y=[v[1] for v in verts_solid],
+            z=[v[2] for v in verts_solid],
+            color="gray",
+            opacity=0.9,
+            name="floor_1",
+            showlegend=False,
+            # flatshading=True,
+            # alphahull=0
+        )
+    )
+
+    # Translucent floor
+    fig.add_trace(
+        go.Mesh3d(
+            x=[v[0] for v in verts_translucent],
+            y=[v[1] for v in verts_translucent],
+            z=[v[2] for v in verts_translucent],
+            color="gray",
+            opacity=0.5,
+            name="floor_2",
+            showlegend=False,
+            # flatshading=True,
+            # alphahull=0
+        )
+    )
+
+    return [minx_all, maxx_all], [miny_all, maxy_all], [minz - 0.5, minz + 3]
+
+
+def plot_joints(
+    fig: go.Figure,
+    joints: np.ndarray,
+    frame_idx: int,
+    skel_name: str,
+    color: str = "red",
+):
+    for chain_name, chain in {
+        "spine": [0, 9, 12, 15],
+        "right_arm": [9, 13, 16, 18, 20],
+        "left_arm": [9, 14, 17, 19, 21],
+        "right_leg": [0, 1, 4, 7, 10],
+        "left_leg": [0, 2, 5, 8, 11],
+    }.items():
+        joints_pos = joints[frame_idx, chain, :]
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=joints_pos[:, 0],
+                y=joints_pos[:, 1],
+                z=joints_pos[:, 2],
+                mode="lines+markers",
+                name=f"{skel_name}_{chain_name}",
+                line=dict(width=7, color="black"),
+                marker=dict(size=3, color=color),
+            )
+        )
+
+
+def plot_trajectory(fig: go.Figure, joints: np.ndarray, minz: float = 0.0, color="red"):
+    trajectory = joints[:, 0, [0, 1]]
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=trajectory[:, 0],
+            y=trajectory[:, 1],
+            z=np.zeros_like(trajectory[:, 0]) + minz,
+            mode="lines",
+            line=dict(width=4, color=color),
+            showlegend=False,
+        )
+    )
 
 def get_random_sample_from_dataset(
     dataset_path: str = "deps/interx/processed/dataset.h5",
