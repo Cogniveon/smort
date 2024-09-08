@@ -192,11 +192,9 @@ def get_joints_from_ckpt(
     scene_id: Optional[str | int] = None,
 ):
     if not os.path.exists(f"artifacts/{model_ckpt}/model.ckpt"):
-        import wandb
+        from pytorch_lightning.loggers import WandbLogger
 
-        run = wandb.init()
-        artifact = run.use_artifact(f"rohit-k-kesavan/smort/{model_ckpt}", type="model")
-        artifact_dir = artifact.download()
+        artifact_dir = WandbLogger.download_artifact(f"rohit-k-kesavan/smort/{model_ckpt}", artifact_type="model")
         print(f"Checkpoint downloaded: {artifact_dir}")
 
     sample, dataset = get_random_sample_from_dataset(scene_id=scene_id)
